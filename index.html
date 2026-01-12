@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I-Model</title>
+  <title>A.P.I-Model — Studio Lighting + GUI</title>
   <style>
     html,body { height:100%; margin:0; background:#111; }
     canvas { display:block; width:100%; height:100vh; }
+    /* Make sure the GUI appears above the canvas */
+    .dg { z-index: 10000 !important; }
   </style>
 
-  <!-- Import map must appear before module scripts that use bare specifiers -->
+  <!-- Import map for 'three' so example modules that import "three" work -->
   <script type="importmap">
   {
     "imports": {
@@ -25,12 +27,16 @@
     import * as THREE from 'three';
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/loaders/GLTFLoader.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
+    import { RectAreaLightUniformsLib } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/lights/RectAreaLightUniformsLib.js';
+    import { RectAreaLightHelper } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/helpers/RectAreaLightHelper.js';
+    import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
+    // Init renderer
     const canvas = document.getElementById('canvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.outputEncoding = THREE.sRGBEncoding; // nicer colors for glTF
+    renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = true;
@@ -39,48 +45,74 @@
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0b0b);
 
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // Camera and controls
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 1000);
     camera.position.set(0, 1.6, 3);
-
-    // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.screenSpacePanning = false;
-    controls.minDistance = 0.1;
-    controls.maxDistance = 200;
 
-    // Lighting: ambient + hemisphere + directional (for nice shading)
-    const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+    // Basic ambient / hemisphere
+    const ambient = new THREE.AmbientLight(0xffffff, 0.25);
     scene.add(ambient);
 
-    const hemi = new THREE.HemisphereLight(0xffffee, 0x111122, 0.35);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x111122, 0.15);
     scene.add(hemi);
 
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-    dir.position.set(5, 10, 7.5);
-    dir.castShadow = true;
-    dir.shadow.mapSize.set(2048, 2048);
-    dir.shadow.camera.near = 0.5;
-    dir.shadow.camera.far = 500;
-    scene.add(dir);
+    // RectAreaLights need initialization of uniforms
+    RectAreaLightUniformsLib.init();
 
-    // Optional ground for shadow catch and reference
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0, roughness: 1 });
+    // Studio-style softboxes (RectAreaLights)
+    const keyLight = new THREE.RectAreaLight(0xffffff, 6.0, 2.6, 1.2);
+    keyLight.position.set(1.8, 1.6, 1.5);
+    keyLight.lookAt(0, 0.2, 0);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.RectAreaLight(0xffffff, 1.2, 2.2, 1.0);
+    fillLight.position.set(-1.6, 1.0, 1.6);
+    fillLight.lookAt(0, 0.2, 0);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.RectAreaLight(0xffffff, 2.0, 1.6, 1.0);
+    rimLight.position.set(0.0, 1.6, -2.5);
+    rimLight.lookAt(0, 0.2, 0);
+    scene.add(rimLight);
+
+    // Strong directional for crisp highlights (acts like a sun/spot)
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.25);
+    dirLight.position.set(5, 10, 7.5);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 50;
+    scene.add(dirLight);
+
+    // Ground plane to catch shadows
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.95, metalness: 0.0 });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), groundMat);
     ground.rotation.x = - Math.PI / 2;
     ground.position.y = -1.0;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Loader and model auto-fit
-    const loader = new GLTFLoader();
+    // Helpers (toggleable)
+    const keyHelper = new RectAreaLightHelper(keyLight);
+    const fillHelper = new RectAreaLightHelper(fillLight);
+    const rimHelper = new RectAreaLightHelper(rimLight);
+    keyHelper.visible = false;
+    fillHelper.visible = false;
+    rimHelper.visible = false;
+    scene.add(keyHelper, fillHelper, rimHelper);
 
-    // Use the working raw URL you confirmed earlier:
+    // Small axes helper so you can orient
+    const axes = new THREE.AxesHelper(0.5);
+    axes.visible = false;
+    scene.add(axes);
+
+    // GLTF loader and model auto-frame
+    const loader = new GLTFLoader();
+    // Use the raw.githubusercontent URL you verified (adjust branch/path if needed)
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
-    // (Or use your GitHub Pages URL if that works:
-    // const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/models/myModel.glb';
-    // )
 
     loader.load(
       modelUrl,
@@ -90,39 +122,38 @@
           if (n.isMesh) {
             n.castShadow = true;
             n.receiveShadow = true;
-            // If lighting still looks wrong you can try:
-            // n.material.side = THREE.DoubleSide;
-            // n.material.needsUpdate = true;
+            // If you want to make sure materials respond to our lights, leave as standard/PBR
+            // If your model appears too dark, try enabling double side (see GUI option below).
           }
         });
 
         scene.add(model);
 
-        // Compute bounding box and frame camera
+        // Compute bounds & position camera
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
 
-        // Reposition model so its center is at the origin (optional)
+        // Recenter model to origin
         model.position.x += (model.position.x - center.x);
         model.position.y += (model.position.y - center.y);
         model.position.z += (model.position.z - center.z);
 
-        // Frame camera: compute a distance so model fits in view
+        // Frame camera: distance so the whole model fits
         const maxDim = Math.max(size.x, size.y, size.z);
         const fov = camera.fov * (Math.PI / 180);
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-        cameraZ *= 1.5; // add some margin
-        camera.position.set(center.x, center.y + maxDim * 0.3, center.z + cameraZ);
+        cameraZ *= 1.6; // margin
+        camera.position.set(center.x, center.y + maxDim * 0.35, center.z + cameraZ);
 
-        camera.near = Math.max(0.1, cameraZ / 1000);
+        camera.near = Math.max(0.01, cameraZ / 1000);
         camera.far = cameraZ * 10;
         camera.updateProjectionMatrix();
 
         controls.target.copy(center);
         controls.update();
 
-        console.log('Model loaded, size:', size, 'center:', center);
+        console.log('Model loaded. size:', size, 'center:', center);
       },
       (xhr) => {
         if (xhr.lengthComputable) {
@@ -134,10 +165,78 @@
       }
     );
 
-    // Small helper object so you can confirm controls are working (optional)
-    const axes = new THREE.AxesHelper(0.5);
-    scene.add(axes);
+    // GUI (lil-gui)
+    const gui = new GUI({ title: 'Studio lights', width: 320 });
+    const params = {
+      exposure: 1.0,
+      background: '#0b0b0b',
+      ambient: ambient.intensity,
+      hemi: hemi.intensity,
+      keyColor: '#ffffff',
+      keyIntensity: keyLight.intensity,
+      fillColor: '#ffffff',
+      fillIntensity: fillLight.intensity,
+      rimColor: '#ffffff',
+      rimIntensity: rimLight.intensity,
+      dirIntensity: dirLight.intensity,
+      shadows: true,
+      doubleSided: false,
+      showHelpers: false,
+      axes: false
+    };
 
+    gui.add(params, 'exposure', 0.1, 2.5, 0.01).name('Exposure').onChange(v => {
+      renderer.toneMappingExposure = v;
+    });
+
+    gui.addColor(params, 'background').name('Background').onChange(v => {
+      scene.background.set(v);
+    });
+
+    const gLights = gui.addFolder('Lights');
+    gLights.add(params, 'ambient', 0, 2, 0.01).name('Ambient').onChange(v => ambient.intensity = v);
+    gLights.add(params, 'hemi', 0, 2, 0.01).name('Hemisphere').onChange(v => hemi.intensity = v);
+
+    const gKey = gLights.addFolder('Key (softbox)');
+    gKey.addColor(params, 'keyColor').name('Color').onChange(v => keyLight.color.set(v));
+    gKey.add(params, 'keyIntensity', 0, 12, 0.01).name('Intensity').onChange(v => keyLight.intensity = v);
+
+    const gFill = gLights.addFolder('Fill (softbox)');
+    gFill.addColor(params, 'fillColor').name('Color').onChange(v => fillLight.color.set(v));
+    gFill.add(params, 'fillIntensity', 0, 6, 0.01).name('Intensity').onChange(v => fillLight.intensity = v);
+
+    const gRim = gLights.addFolder('Rim (back)');
+    gRim.addColor(params, 'rimColor').name('Color').onChange(v => rimLight.color.set(v));
+    gRim.add(params, 'rimIntensity', 0, 8, 0.01).name('Intensity').onChange(v => rimLight.intensity = v);
+
+    gLights.add(params, 'dirIntensity', 0, 2, 0.01).name('Directional').onChange(v => dirLight.intensity = v);
+
+    gui.add(params, 'shadows').name('Shadows').onChange(v => {
+      renderer.shadowMap.enabled = v;
+      // update meshes if needed; new shadow setting takes effect next render
+    });
+
+    gui.add(params, 'doubleSided').name('Double Sided').onChange(v => {
+      scene.traverse((n) => {
+        if (n.isMesh && n.material) {
+          n.material.side = v ? THREE.DoubleSide : THREE.FrontSide;
+          n.material.needsUpdate = true;
+        }
+      });
+    });
+
+    gui.add(params, 'showHelpers').name('Show Light Helpers').onChange(v => {
+      keyHelper.visible = v;
+      fillHelper.visible = v;
+      rimHelper.visible = v;
+    });
+
+    gui.add(params, 'axes').name('Show Axes').onChange(v => axes.visible = v);
+
+    // Place GUI top-right (default) and ensure pointer events
+    gui.domElement.style.zIndex = '10000';
+
+    // Render loop
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
@@ -145,6 +244,7 @@
     }
     animate();
 
+    // Resize handling
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
