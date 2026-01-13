@@ -168,7 +168,7 @@
       rimIntensity: rimLight.intensity,
       dirIntensity: dirLight.intensity,
       shadows: true,
-      doubleSided: true, // <-- enabled by default
+      doubleSided: true, // enabled by default
       showHelpers: false,
       axes: false
     };
@@ -234,10 +234,14 @@
       }
     );
 
-    // GUI
+    // --- Remove any existing GUI elements left in the DOM (prevents duplicate/old GUI) ---
+    const existingGUIs = document.querySelectorAll('.lil-gui, .dg');
+    existingGUIs.forEach(e => e.remove());
+
+    // Create a fresh GUI instance (styled via CSS above)
     const gui = new GUI({ title: 'Studio lights', width: 300 });
 
-    // Make sure the GUI is fixed bottom-right even if library doesn't set it by default
+    // Make sure the GUI is fixed bottom-right (defensive)
     gui.domElement.style.position = 'fixed';
     gui.domElement.style.right = '20px';
     gui.domElement.style.bottom = '20px';
@@ -246,6 +250,7 @@
     gui.domElement.style.backdropFilter = 'blur(8px) saturate(120%)';
     gui.domElement.style.zIndex = '10000';
 
+    // GUI controls
     gui.add(params, 'exposure', 0.1, 2.5, 0.01).name('Exposure').onChange(v => {
       renderer.toneMappingExposure = v;
     });
@@ -295,10 +300,7 @@
 
     gui.add(params, 'axes').name('Show Axes').onChange(v => axes.visible = v);
 
-    // Make the GUI header resemble a Material-You accent (also handled via CSS above)
-    // No further JS needed; the CSS in <head> will style the gui elements.
-
-    // Animate
+    // Animation loop
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
@@ -306,6 +308,7 @@
     }
     animate();
 
+    // Resize handling
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
