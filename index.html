@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I-Model — Fully Even Lighting (no directional lights)</title>
+  <title>A.P.I-Model — Even Lighting + Directional Cluster</title>
   <style>
     html,body { height:100%; margin:0; background:#0b0b0b; }
     canvas { display:block; width:100%; height:100vh; }
 
-    /* GUI styling (keeps your Material-like look) */
+    /* GUI styling (Material-like) */
     .lil-gui, .dg {
       position: fixed !important;
       right: 28px;
@@ -52,15 +52,15 @@
     import { RectAreaLightUniformsLib } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/lights/RectAreaLightUniformsLib.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
-    // --- Renderer & scene ---
+    // --- Renderer & scene setup ---
     const canvas = document.getElementById('canvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.5;
-    renderer.shadowMap.enabled = false; // default no shadows for fully even lighting
+    renderer.toneMappingExposure = 1.5; // baseline
+    renderer.shadowMap.enabled = false;  // default: no shadows for flat look
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.physicallyCorrectLights = true;
 
@@ -72,7 +72,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- Even lighting setup (ambient + hemi + 4 rect area lights) ---
+    // --- Even lighting by default (ambient + hemi + 4 rect area lights) ---
     const ambient = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambient);
 
@@ -80,7 +80,7 @@
     scene.add(hemi);
 
     RectAreaLightUniformsLib.init();
-    const rectLights = [];
+    const rectLights = [];             // 4 area lights around the model
     const rectHelpers = [];
 
     const rectDefaults = { width: 2.6, height: 1.2, intensity: 3.0, radius: 1.2, elevation: 1.2 };
@@ -92,54 +92,83 @@
       scene.add(rl);
     }
 
-    // ENSURE NO DIRECTIONAL LIGHTS: helper to remove any DirectionalLight instances
-    function removeDirectionalLights() {
-      const toRemove = [];
-      scene.traverse((obj) => {
-        if (obj.isDirectionalLight) toRemove.push(obj);
-      });
-      toRemove.forEach(l => {
-        if (l.parent) l.parent.remove(l);
-      });
-    }
-    // run once at start to clear anything left over
-    removeDirectionalLights();
+    // --- Directional cluster (multiple directional lights placed around model)
+    // We'll create/attach them on demand; keep arrays for management.
+    let dirLights = [];         // array of directional lights
+    let dirTargets = [];        // matching target objects per directional light
 
-    // small axes helper (optional)
+    function createDirectionalCluster(count = 6, intensity = 0.6, distance = 5, elevation = 2.2) {
+      removeDirectionalCluster(); // ensure fresh
+      dirLights = [];
+      dirTargets = [];
+      // spread lights evenly in azimuth
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const x = Math.cos(angle) * distance;
+        const z = Math.sin(angle) * distance;
+        const y = elevation;
+        const dl = new THREE.DirectionalLight(0xffffff, intensity);
+        dl.position.set(x, y, z);
+        dl.castShadow = false; // keep shadows off by default; user can enable via GUI later
+        const target = new THREE.Object3D();
+        target.position.set(0, 0, 0);
+        scene.add(target);
+        dl.target = target;
+        scene.add(dl);
+        dirLights.push(dl);
+        dirTargets.push(target);
+      }
+    }
+
+    function removeDirectionalCluster() {
+      if (dirLights.length) {
+        dirLights.forEach(dl => { if (dl.parent) dl.parent.remove(dl); });
+        dirTargets.forEach(t => { if (t.parent) t.parent.remove(t); });
+      }
+      dirLights = [];
+      dirTargets = [];
+    }
+
+    // Start with no directional cluster (user requested even lighting), but GUI will allow adding it
+    removeDirectionalCluster();
+
+    // --- small axes helper (optional) ---
     const axes = new THREE.AxesHelper(0.5);
     axes.visible = false;
     scene.add(axes);
 
-    // --- Loader + model ---
+    // --- Model loader + framing ---
     const loader = new GLTFLoader();
+    // use the URL you provided earlier
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
     let loadedModel = null;
     let modelCenter = new THREE.Vector3(0, 0, 0);
 
-    loader.load(modelUrl,
+    loader.load(
+      modelUrl,
       (gltf) => {
         const model = gltf.scene;
         loadedModel = model;
         model.traverse(n => {
           if (n.isMesh) {
-            // explicitly disable shadows on meshes for even lighting
+            // disable baked shadows/shadow casting for even lighting
             n.castShadow = false;
             n.receiveShadow = false;
             if (n.material) n.material.needsUpdate = true;
           }
         });
 
-        // remove any directional lights that might have been added previously
-        removeDirectionalLights();
-
         scene.add(model);
+
+        // remove directional lights if any were added previously — user wanted even by default
+        removeDirectionalCluster();
 
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         modelCenter.copy(box.getCenter(new THREE.Vector3()));
 
-        // recenter model
+        // recenter
         model.position.x += (model.position.x - modelCenter.x);
         model.position.y += (model.position.y - modelCenter.y);
         model.position.z += (model.position.z - modelCenter.z);
@@ -155,31 +184,40 @@
         controls.target.copy(modelCenter);
         controls.update();
 
-        // position rect lights once center known
+        // position rect lights now that center is correct
         positionRectLights();
       },
-      (xhr) => { if (xhr.lengthComputable) console.log(`Model ${(xhr.loaded/xhr.total*100).toFixed(1)}% loaded`); },
-      (err) => { console.error('GLTF load error:', err); }
+      (xhr) => {
+        if (xhr.lengthComputable) console.log(`Model ${(xhr.loaded / xhr.total * 100).toFixed(1)}% loaded`);
+      },
+      (err) => {
+        console.error('GLTF load error:', err);
+      }
     );
 
-    // Remove previous GUI nodes (avoid duplicates)
-    document.querySelectorAll('.lil-gui, .dg').forEach(e => e.remove());
+    // --- GUI setup ---
+    document.querySelectorAll('.lil-gui, .dg').forEach(e => e.remove()); // remove old GUIs
 
-    // --- GUI params ---
     const params = {
-      // exposure controlled only via buttons (0..20)
-      exposure: renderer.toneMappingExposure,
       background: '#0b0b0b',
       shadows: false,
       doubleSided: true,
       showHelpers: false,
       axes: false,
-      // area light tuning
+      // area lights
       areaWidth: rectDefaults.width,
       areaHeight: rectDefaults.height,
       areaIntensity: rectDefaults.intensity,
       areaRadius: rectDefaults.radius,
-      areaElevation: rectDefaults.elevation
+      areaElevation: rectDefaults.elevation,
+      // directional cluster options
+      useDirectionalCluster: false,
+      dirCount: 6,
+      dirIntensity: 0.6,
+      dirDistance: 5,
+      dirElevation: 2.2,
+      // exposure via buttons (0..20)
+      exposure: renderer.toneMappingExposure
     };
 
     const gui = new GUI({ width: 220 });
@@ -189,39 +227,29 @@
     gui.domElement.style.zIndex = '10000';
     const defaultTitle = gui.domElement.querySelector('.title'); if (defaultTitle) defaultTitle.remove();
 
-    // background color
-    const backgroundCtrl = gui.addColor(params, 'background').name('background').onChange(v => {
-      scene.background.set(v);
-    });
+    // Background
+    gui.addColor(params, 'background').name('background').onChange(v => scene.background.set(v));
 
-    // shadows toggle
-    const shadowsCtrl = gui.add(params, 'shadows').name('shadows').onChange(v => {
+    // Shadows toggle (turns mesh and renderer shadows on/off)
+    gui.add(params, 'shadows').name('shadows').onChange(v => {
       renderer.shadowMap.enabled = !!v;
       if (loadedModel) {
         loadedModel.traverse(n => {
-          if (n.isMesh) {
-            n.castShadow = !!v;
-            n.receiveShadow = !!v;
-          }
+          if (n.isMesh) { n.castShadow = !!v; n.receiveShadow = !!v; }
         });
       }
     });
 
-    // double-sided controller
-    const doubleCtrl = gui.add(params, 'doubleSided').name('double sided').onChange(v => {
-      applyDoubleSided(v);
-    });
+    // Double sided
+    gui.add(params, 'doubleSided').name('double sided').onChange(v => applyDoubleSided(v));
 
-    // helpers & axes toggles
-    const helpersCtrl = gui.add(params, 'showHelpers').name('show light helpers').onChange(v => {
+    // Helpers / axes
+    gui.add(params, 'showHelpers').name('show light helpers').onChange(v => {
       rectHelpers.forEach(h => scene.remove(h));
       rectHelpers.length = 0;
       if (v) {
         rectLights.forEach(rl => {
-          const helper = new THREE.Mesh(
-            new THREE.PlaneGeometry(rl.width, rl.height),
-            new THREE.MeshBasicMaterial({ color: 0xffff00, opacity: 0.06, transparent: true })
-          );
+          const helper = new THREE.Mesh(new THREE.PlaneGeometry(rl.width, rl.height), new THREE.MeshBasicMaterial({ color: 0xffff00, opacity: 0.06, transparent: true }));
           helper.position.copy(rl.position);
           helper.lookAt(modelCenter);
           rectHelpers.push(helper);
@@ -229,76 +257,74 @@
         });
       }
     });
-    const axesCtrl = gui.add(params, 'axes').name('show axes').onChange(v => { axes.visible = v; });
+    gui.add(params, 'axes').name('show axes').onChange(v => { axes.visible = v; });
 
-    // light folder
+    // Light folder for area lights
     const lightFolder = gui.addFolder('light');
-    const areaWidthCtrl = lightFolder.add(params, 'areaWidth', 0.2, 4.0, 0.01).name('area width').onChange(v => {
-      rectLights.forEach(rl => rl.width = v); positionRectLights();
-    });
-    const areaHeightCtrl = lightFolder.add(params, 'areaHeight', 0.2, 3.0, 0.01).name('area height').onChange(v => {
-      rectLights.forEach(rl => rl.height = v); positionRectLights();
-    });
-    const areaIntensityCtrl = lightFolder.add(params, 'areaIntensity', 0, 40, 0.01).name('area intensity').onChange(v => {
-      rectLights.forEach(rl => rl.intensity = v);
-    });
-    const areaRadiusCtrl = lightFolder.add(params, 'areaRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => positionRectLights());
-    const areaElevationCtrl = lightFolder.add(params, 'areaElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => positionRectLights());
+    lightFolder.add(params, 'areaWidth', 0.2, 4.0, 0.01).name('area width').onChange(v => { rectLights.forEach(rl => rl.width = v); positionRectLights(); });
+    lightFolder.add(params, 'areaHeight', 0.2, 3.0, 0.01).name('area height').onChange(v => { rectLights.forEach(rl => rl.height = v); positionRectLights(); });
+    lightFolder.add(params, 'areaIntensity', 0, 40, 0.01).name('area intensity').onChange(v => { rectLights.forEach(rl => rl.intensity = v); });
+    lightFolder.add(params, 'areaRadius', 0.2, 4.0, 0.01).name('radius').onChange(() => positionRectLights());
+    lightFolder.add(params, 'areaElevation', -2.0, 6.0, 0.01).name('elevation').onChange(() => positionRectLights());
     lightFolder.close();
 
-    // Exposure read-only display (we removed the top exposure slider)
+    // Directional cluster controls
+    const dirFolder = gui.addFolder('directional cluster');
+    dirFolder.add(params, 'useDirectionalCluster').name('enable cluster').onChange(v => {
+      if (v) {
+        createDirectionalCluster(params.dirCount, params.dirIntensity, params.dirDistance, params.dirElevation);
+        // ensure the cluster aims at the model center if model already loaded
+        updateDirectionalTargets();
+      } else {
+        removeDirectionalCluster();
+      }
+    });
+    dirFolder.add(params, 'dirCount', 2, 12, 1).name('count').onChange(v => {
+      if (params.useDirectionalCluster) createDirectionalCluster(v, params.dirIntensity, params.dirDistance, params.dirElevation);
+    });
+    dirFolder.add(params, 'dirIntensity', 0, 4, 0.01).name('intensity').onChange(v => {
+      dirLights.forEach(dl => dl.intensity = v);
+    });
+    dirFolder.add(params, 'dirDistance', 1, 15, 0.1).name('distance').onChange(v => {
+      updateDirectionalPositions();
+    });
+    dirFolder.add(params, 'dirElevation', 0, 8, 0.1).name('elevation').onChange(v => {
+      updateDirectionalPositions();
+    });
+    dirFolder.close();
+
+    // Exposure display and brighter/darker buttons (exposure range cap 0..20)
     const exposureDisplay = { exposureValue: params.exposure };
     gui.add(exposureDisplay, 'exposureValue').name('exposure').listen();
 
-    // actions: flat preset plus exposure +/- buttons
     const actions = {
+      brighter: () => { params.exposure = Math.min(20.0, Math.round((params.exposure + 0.5) * 100) / 100); applyExposure(); },
+      darker:  () => { params.exposure = Math.max(0.0, Math.round((params.exposure - 0.5) * 100) / 100); applyExposure(); },
       flat: () => {
-        // Guarantee removal of any DirectionalLight and disable shadows
-        removeDirectionalLights();
-        params.shadows = false; shadowsCtrl.setValue(false);
-        renderer.shadowMap.enabled = false;
+        // flat preset: disable cluster, maximize area intensity, no shadows
+        params.useDirectionalCluster = false;
+        removeDirectionalCluster();
+        // update GUI checkbox if present
+        const chk = dirFolder.__controllers && dirFolder.__controllers.find(c => c.property === 'useDirectionalCluster');
+        if (chk) chk.setValue(false);
 
-        // set even-lit values
-        params.doubleSided = true; doubleCtrl.setValue(true); applyDoubleSided(true);
+        params.shadows = false;
+        const sc = gui.__controllers.find(c => c.property === 'shadows');
+        if (sc) sc.setValue(false);
 
-        params.areaIntensity = 30.0;
-        areaIntensityCtrl.setValue(params.areaIntensity);
+        params.doubleSided = true;
+        const dc = gui.__controllers.find(c => c.property === 'doubleSided');
+        if (dc) dc.setValue(true);
+        applyDoubleSided(true);
 
-        params.areaRadius = 0.6;
-        areaRadiusCtrl.setValue(params.areaRadius);
+        params.areaIntensity = 30.0; lightFolder.__controllers.forEach(c => { if (c.property === 'areaIntensity') c.setValue(params.areaIntensity); });
+        params.areaRadius = 0.6; lightFolder.__controllers.forEach(c => { if (c.property === 'areaRadius') c.setValue(params.areaRadius); });
+        params.areaWidth = 3.6; lightFolder.__controllers.forEach(c => { if (c.property === 'areaWidth') c.setValue(params.areaWidth); });
+        params.areaHeight = 1.8; lightFolder.__controllers.forEach(c => { if (c.property === 'areaHeight') c.setValue(params.areaHeight); });
 
-        params.areaWidth = 3.6;
-        areaWidthCtrl.setValue(params.areaWidth);
-
-        params.areaHeight = 1.8;
-        areaHeightCtrl.setValue(params.areaHeight);
-
-        // set exposure up (clamped)
-        params.exposure = Math.min(20.0, 10.0);
-        applyExposure();
-
-        // ensure rect lights applied and positioned
+        params.exposure = Math.min(20.0, 10.0); applyExposure();
         rectLights.forEach(rl => { rl.intensity = params.areaIntensity; rl.width = params.areaWidth; rl.height = params.areaHeight; });
         positionRectLights();
-
-        // Force materials to update and remove any baked shadows (best-effort)
-        if (loadedModel) {
-          loadedModel.traverse(n => {
-            if (n.isMesh && n.material) {
-              n.material.needsUpdate = true;
-            }
-          });
-        }
-      },
-
-      brighter: () => {
-        params.exposure = Math.min(20.0, Math.round((params.exposure + 0.5) * 100) / 100);
-        applyExposure();
-      },
-
-      darker: () => {
-        params.exposure = Math.max(0.0, Math.round((params.exposure - 0.5) * 100) / 100);
-        applyExposure();
       }
     };
 
@@ -306,10 +332,31 @@
     gui.add(actions, 'brighter').name('brighter +');
     gui.add(actions, 'darker').name('darker -');
 
-    // Ensure GUI popups render above everything
+    // Ensure GUI popups render above
     gui.domElement.querySelectorAll('.picker, .popup').forEach(el => el.style.zIndex = '11000');
 
-    // Helper: apply double-sided to model materials
+    // --- Helpers: directional cluster position/target updates ---
+    function updateDirectionalPositions() {
+      if (!dirLights || dirLights.length === 0) return;
+      const count = dirLights.length;
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        const x = Math.cos(a) * params.dirDistance;
+        const z = Math.sin(a) * params.dirDistance;
+        const y = params.dirElevation;
+        dirLights[i].position.set(modelCenter.x + x, modelCenter.y + y, modelCenter.z + z);
+        // ensure each target points to model center
+        if (dirTargets[i]) dirTargets[i].position.set(modelCenter.x, modelCenter.y, modelCenter.z);
+      }
+    }
+
+    function updateDirectionalTargets() {
+      if (!dirTargets || dirTargets.length === 0) return;
+      dirTargets.forEach(t => t.position.set(modelCenter.x, modelCenter.y, modelCenter.z));
+      updateDirectionalPositions();
+    }
+
+    // --- Utility: apply double-sided to materials ---
     function applyDoubleSided(enabled) {
       if (!loadedModel) return;
       loadedModel.traverse(n => {
@@ -320,19 +367,7 @@
       });
     }
 
-    // Apply exposure (clamped 0..20) and tie ambient to it
-    function applyExposure() {
-      params.exposure = Math.min(20.0, Math.max(0.0, params.exposure));
-      renderer.toneMappingExposure = params.exposure;
-      // scale ambient so scene brightens
-      ambient.intensity = Math.max(0.01, params.exposure * 0.7);
-      exposureDisplay.exposureValue = params.exposure;
-      if (loadedModel) {
-        loadedModel.traverse(n => { if (n.isMesh && n.material) n.material.needsUpdate = true; });
-      }
-    }
-
-    // positionRectLights: arrange 4 rect lights symmetrically about model center
+    // --- Area light positioning ---
     function positionRectLights() {
       const radius = params.areaRadius;
       const elevation = params.areaElevation;
@@ -340,7 +375,9 @@
       for (let i = 0; i < rectLights.length; i++) {
         const a = angles[i];
         const rl = rectLights[i];
-        rl.width = params.areaWidth; rl.height = params.areaHeight; rl.intensity = params.areaIntensity;
+        rl.width = params.areaWidth;
+        rl.height = params.areaHeight;
+        rl.intensity = params.areaIntensity;
         rl.position.set(
           modelCenter.x + Math.cos(a) * radius,
           modelCenter.y + elevation,
@@ -348,28 +385,56 @@
         );
         rl.lookAt(modelCenter);
       }
+      // if directional cluster exists, ensure it points to center as well
+      updateDirectionalTargets();
     }
 
-    // Render loop
+    // --- Exposure handling ---
+    function applyExposure() {
+      params.exposure = Math.min(20.0, Math.max(0.0, params.exposure));
+      renderer.toneMappingExposure = params.exposure;
+      ambient.intensity = Math.max(0.01, params.exposure * 0.7);
+      // update read-only display
+      const disp = gui.__controllers.find(c => c.property === 'exposureValue');
+      if (disp) disp.object.exposureValue = params.exposure;
+      if (loadedModel) loadedModel.traverse(n => { if (n.isMesh && n.material) n.material.needsUpdate = true; });
+    }
+
+    // Expose a fake controller so the "exposure" read-only monitor updates (using the gui reference)
+    // Note: we update this value via applyExposure above and the gui shows it because we added it earlier.
+
+    // --- Render loop ---
     function animate(now) {
       requestAnimationFrame(animate);
 
-      // apply GUI-driven rect-light properties every frame
+      // ensure area lights reflect GUI values
       rectLights.forEach(rl => { rl.intensity = params.areaIntensity; rl.width = params.areaWidth; rl.height = params.areaHeight; });
       positionRectLights();
 
-      // ambient already tied to exposure via applyExposure()
+      // if directional cluster active, ensure its intensities/positions track GUI
+      if (params.useDirectionalCluster && dirLights.length) {
+        dirLights.forEach(dl => dl.intensity = params.dirIntensity);
+        updateDirectionalPositions();
+        // ensure targets are placed at model center
+        updateDirectionalTargets();
+      }
+
       controls.update();
       renderer.render(scene, camera);
     }
     requestAnimationFrame(animate);
 
-    // Initial apply
+    // Defensive: ensure no stray DirectionalLights exist, then apply initial exposure & double-sided
+    function removeAllDirectionalLightsFromScene() {
+      const toRemove = [];
+      scene.traverse(o => { if (o.isDirectionalLight) toRemove.push(o); });
+      toRemove.forEach(l => { if (l.parent) l.parent.remove(l); });
+    }
+    removeAllDirectionalLightsFromScene();
     applyExposure();
     applyDoubleSided(params.doubleSided);
-    removeDirectionalLights();
 
-    // Resize handling
+    // Resize
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
