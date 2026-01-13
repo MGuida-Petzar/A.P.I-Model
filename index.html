@@ -3,87 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I-Model — Bright Even Lighting + Custom GUI</title>
+  <title>A.P.I-Model — Fully Even Lighting (no directional lights)</title>
   <style>
     html,body { height:100%; margin:0; background:#0b0b0b; }
     canvas { display:block; width:100%; height:100vh; }
 
-    /* Outer GUI card (Material-You inspired) */
+    /* GUI styling (keeps your Material-like look) */
     .lil-gui, .dg {
       position: fixed !important;
       right: 28px;
       top: 28px;
       width: 220px !important;
-      max-width: 220px !important;
       border-radius: 14px;
       overflow: visible !important;
       background: rgba(18,18,18,0.85);
       box-shadow: 0 12px 30px rgba(2,6,23,0.6);
-      border: 6px solid #f7b1a8; /* soft pink frame */
+      border: 6px solid #f7b1a8;
       z-index: 10000;
-      padding: 8px 8px 12px 8px;
-      font-family: "Roboto", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      padding: 8px;
       color: #fff;
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
+      font-family: "Roboto", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     }
-
-    /* Hide default title */
     .lil-gui .title, .dg .title { display: none !important; }
-
-    /* Pill controls */
     .lil-gui .controller, .dg .controller {
-      margin: 8px 4px;
-      padding: 6px 10px;
-      border-radius: 12px;
+      margin: 8px 4px; padding: 6px 10px; border-radius: 12px;
       background: linear-gradient(180deg, rgba(67,93,82,0.22), rgba(49,71,60,0.12));
-      box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 38px;
+      display:flex; align-items:center; justify-content:space-between; height:38px;
     }
-
-    .lil-gui .label, .dg .label {
-      color: #f2f6f3;
-      font-weight: 700;
-      font-size: 14px;
-      text-transform: lowercase;
-      letter-spacing: -0.5px;
-      margin-right: 8px;
-    }
-
-    .lil-gui input[type="range"] { accent-color: #66c2a4; }
-
-    .lil-gui input[type="color"], .dg input[type="color"] {
-      width: 30px;
-      height: 26px;
-      border-radius: 8px;
-      border: none;
-      box-shadow: 0 1px 0 rgba(0,0,0,0.25) inset;
-      padding: 0;
-      margin-left: 6px;
-      background: transparent;
-    }
-
-    .lil-gui .boolean, .dg .boolean {
-      display:flex;
-      align-items:center;
-      justify-content:flex-end;
-      gap: 8px;
-    }
-
-    .lil-gui .picker, .lil-gui .popup, .dg .picker, .dg .popup {
-      z-index: 11000 !important;
-    }
-
-    .lil-gui .folder, .dg .folder {
-      margin: 6px 4px;
-      padding: 6px 8px;
-      border-radius: 10px;
-      background: rgba(0,0,0,0.08);
-    }
-
+    .lil-gui .label, .dg .label { color:#f2f6f3; font-weight:700; font-size:14px; text-transform:lowercase; }
     body { padding: 12px; }
   </style>
 
@@ -113,7 +60,7 @@
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.5;
-    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.enabled = false; // default no shadows for fully even lighting
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.physicallyCorrectLights = true;
 
@@ -125,7 +72,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- Bright, even lighting setup (4 area lights + ambient/hemi) ---
+    // --- Even lighting setup (ambient + hemi + 4 rect area lights) ---
     const ambient = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambient);
 
@@ -136,7 +83,6 @@
     const rectLights = [];
     const rectHelpers = [];
 
-    // defaults for area lights
     const rectDefaults = { width: 2.6, height: 1.2, intensity: 3.0, radius: 1.2, elevation: 1.2 };
 
     for (let i = 0; i < 4; i++) {
@@ -146,8 +92,20 @@
       scene.add(rl);
     }
 
-    // NOTE: directional light removed entirely to ensure truly flat/even lighting
+    // ENSURE NO DIRECTIONAL LIGHTS: helper to remove any DirectionalLight instances
+    function removeDirectionalLights() {
+      const toRemove = [];
+      scene.traverse((obj) => {
+        if (obj.isDirectionalLight) toRemove.push(obj);
+      });
+      toRemove.forEach(l => {
+        if (l.parent) l.parent.remove(l);
+      });
+    }
+    // run once at start to clear anything left over
+    removeDirectionalLights();
 
+    // small axes helper (optional)
     const axes = new THREE.AxesHelper(0.5);
     axes.visible = false;
     scene.add(axes);
@@ -165,11 +123,15 @@
         loadedModel = model;
         model.traverse(n => {
           if (n.isMesh) {
-            n.castShadow = false; // shadows off for fully even lighting effect by default
+            // explicitly disable shadows on meshes for even lighting
+            n.castShadow = false;
             n.receiveShadow = false;
             if (n.material) n.material.needsUpdate = true;
           }
         });
+
+        // remove any directional lights that might have been added previously
+        removeDirectionalLights();
 
         scene.add(model);
 
@@ -193,34 +155,31 @@
         controls.target.copy(modelCenter);
         controls.update();
 
-        // apply double-sided state if set
-        applyDoubleSided(params.doubleSided);
-
-        // position rect lights now that center is known
+        // position rect lights once center known
         positionRectLights();
       },
       (xhr) => { if (xhr.lengthComputable) console.log(`Model ${(xhr.loaded/xhr.total*100).toFixed(1)}% loaded`); },
       (err) => { console.error('GLTF load error:', err); }
     );
 
-    // Remove previous GUI DOM nodes (avoid duplicates)
+    // Remove previous GUI nodes (avoid duplicates)
     document.querySelectorAll('.lil-gui, .dg').forEach(e => e.remove());
 
     // --- GUI params ---
     const params = {
-      // exposure will be changed only by the brighten/darken buttons (0..20 cap)
+      // exposure controlled only via buttons (0..20)
       exposure: renderer.toneMappingExposure,
       background: '#0b0b0b',
       shadows: false,
       doubleSided: true,
       showHelpers: false,
       axes: false,
+      // area light tuning
       areaWidth: rectDefaults.width,
       areaHeight: rectDefaults.height,
       areaIntensity: rectDefaults.intensity,
       areaRadius: rectDefaults.radius,
-      areaElevation: rectDefaults.elevation,
-      dirIntensity: 0 // removed directional light; keep param for legacy but unused
+      areaElevation: rectDefaults.elevation
     };
 
     const gui = new GUI({ width: 220 });
@@ -230,18 +189,14 @@
     gui.domElement.style.zIndex = '10000';
     const defaultTitle = gui.domElement.querySelector('.title'); if (defaultTitle) defaultTitle.remove();
 
-    // NOTE: original exposure slider removed as requested.
-    // We'll provide "brighter +" / "darker -" actions and a new exposure display controller (read-only style).
-
-    // Background color
+    // background color
     const backgroundCtrl = gui.addColor(params, 'background').name('background').onChange(v => {
       scene.background.set(v);
     });
 
-    // Shadows toggle (kept but default off)
+    // shadows toggle
     const shadowsCtrl = gui.add(params, 'shadows').name('shadows').onChange(v => {
-      renderer.shadowMap.enabled = v;
-      // If user enables shadows, enable receive/cast shadows on meshes
+      renderer.shadowMap.enabled = !!v;
       if (loadedModel) {
         loadedModel.traverse(n => {
           if (n.isMesh) {
@@ -252,12 +207,12 @@
       }
     });
 
-    // Double sided controller (fixed: apply immediately)
+    // double-sided controller
     const doubleCtrl = gui.add(params, 'doubleSided').name('double sided').onChange(v => {
       applyDoubleSided(v);
     });
 
-    // Helpers and axes toggles
+    // helpers & axes toggles
     const helpersCtrl = gui.add(params, 'showHelpers').name('show light helpers').onChange(v => {
       rectHelpers.forEach(h => scene.remove(h));
       rectHelpers.length = 0;
@@ -274,78 +229,76 @@
         });
       }
     });
+    const axesCtrl = gui.add(params, 'axes').name('show axes').onChange(v => { axes.visible = v; });
 
-    const axesCtrl = gui.add(params, 'axes').name('show axes').onChange(v => {
-      axes.visible = v;
-    });
-
-    // Light folder
+    // light folder
     const lightFolder = gui.addFolder('light');
     const areaWidthCtrl = lightFolder.add(params, 'areaWidth', 0.2, 4.0, 0.01).name('area width').onChange(v => {
-      rectLights.forEach(rl => rl.width = v);
-      positionRectLights();
+      rectLights.forEach(rl => rl.width = v); positionRectLights();
     });
     const areaHeightCtrl = lightFolder.add(params, 'areaHeight', 0.2, 3.0, 0.01).name('area height').onChange(v => {
-      rectLights.forEach(rl => rl.height = v);
-      positionRectLights();
+      rectLights.forEach(rl => rl.height = v); positionRectLights();
     });
     const areaIntensityCtrl = lightFolder.add(params, 'areaIntensity', 0, 40, 0.01).name('area intensity').onChange(v => {
       rectLights.forEach(rl => rl.intensity = v);
     });
-    const areaRadiusCtrl = lightFolder.add(params, 'areaRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => {
-      positionRectLights();
-    });
-    const areaElevationCtrl = lightFolder.add(params, 'areaElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => {
-      positionRectLights();
-    });
+    const areaRadiusCtrl = lightFolder.add(params, 'areaRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => positionRectLights());
+    const areaElevationCtrl = lightFolder.add(params, 'areaElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => positionRectLights());
     lightFolder.close();
 
-    // Brightness controls: remove top exposure slider; add buttons and a read-only display for current exposure
-    // read-only-ish display (we use a fake controller to show numeric value)
+    // Exposure read-only display (we removed the top exposure slider)
     const exposureDisplay = { exposureValue: params.exposure };
-    const exposureDisplayCtrl = gui.add(exposureDisplay, 'exposureValue').name('exposure').listen();
+    gui.add(exposureDisplay, 'exposureValue').name('exposure').listen();
 
+    // actions: flat preset plus exposure +/- buttons
     const actions = {
-      brighter: () => {
-        params.exposure = Math.min(20.0, Math.round((params.exposure + 0.5) * 100) / 100);
-        applyExposure();
-      },
-      darker: () => {
-        params.exposure = Math.max(0.0, Math.round((params.exposure - 0.5) * 100) / 100);
-        applyExposure();
-      },
       flat: () => {
-        // fully even-lit preset: remove any directional influence and make area lights bright
-        params.shadows = false;
-        shadowsCtrl.setValue(params.shadows);
+        // Guarantee removal of any DirectionalLight and disable shadows
+        removeDirectionalLights();
+        params.shadows = false; shadowsCtrl.setValue(false);
+        renderer.shadowMap.enabled = false;
 
-        params.doubleSided = true;
-        doubleCtrl.setValue(params.doubleSided);
-        applyDoubleSided(params.doubleSided);
+        // set even-lit values
+        params.doubleSided = true; doubleCtrl.setValue(true); applyDoubleSided(true);
 
-        params.areaIntensity = 20.0;
+        params.areaIntensity = 30.0;
         areaIntensityCtrl.setValue(params.areaIntensity);
 
         params.areaRadius = 0.6;
         areaRadiusCtrl.setValue(params.areaRadius);
 
-        params.areaWidth = 3.4;
+        params.areaWidth = 3.6;
         areaWidthCtrl.setValue(params.areaWidth);
 
-        params.areaHeight = 1.6;
+        params.areaHeight = 1.8;
         areaHeightCtrl.setValue(params.areaHeight);
 
-        // set exposure high and clamp to 20
-        params.exposure = 8.0;
+        // set exposure up (clamped)
+        params.exposure = Math.min(20.0, 10.0);
         applyExposure();
 
-        // ensure rect lights positioned and applied
-        rectLights.forEach(rl => {
-          rl.intensity = params.areaIntensity;
-          rl.width = params.areaWidth;
-          rl.height = params.areaHeight;
-        });
+        // ensure rect lights applied and positioned
+        rectLights.forEach(rl => { rl.intensity = params.areaIntensity; rl.width = params.areaWidth; rl.height = params.areaHeight; });
         positionRectLights();
+
+        // Force materials to update and remove any baked shadows (best-effort)
+        if (loadedModel) {
+          loadedModel.traverse(n => {
+            if (n.isMesh && n.material) {
+              n.material.needsUpdate = true;
+            }
+          });
+        }
+      },
+
+      brighter: () => {
+        params.exposure = Math.min(20.0, Math.round((params.exposure + 0.5) * 100) / 100);
+        applyExposure();
+      },
+
+      darker: () => {
+        params.exposure = Math.max(0.0, Math.round((params.exposure - 0.5) * 100) / 100);
+        applyExposure();
       }
     };
 
@@ -353,7 +306,7 @@
     gui.add(actions, 'brighter').name('brighter +');
     gui.add(actions, 'darker').name('darker -');
 
-    // Ensure popovers above GUI
+    // Ensure GUI popups render above everything
     gui.domElement.querySelectorAll('.picker, .popup').forEach(el => el.style.zIndex = '11000');
 
     // Helper: apply double-sided to model materials
@@ -367,23 +320,19 @@
       });
     }
 
-    // Apply exposure value to renderer and tie to ambient intensity
+    // Apply exposure (clamped 0..20) and tie ambient to it
     function applyExposure() {
-      // clamp and apply
       params.exposure = Math.min(20.0, Math.max(0.0, params.exposure));
       renderer.toneMappingExposure = params.exposure;
-      // make ambient scale with exposure so it brightens the whole model
+      // scale ambient so scene brightens
       ambient.intensity = Math.max(0.01, params.exposure * 0.7);
       exposureDisplay.exposureValue = params.exposure;
-      // ensure meshes update if needed
       if (loadedModel) {
-        loadedModel.traverse(n => {
-          if (n.isMesh && n.material) n.material.needsUpdate = true;
-        });
+        loadedModel.traverse(n => { if (n.isMesh && n.material) n.material.needsUpdate = true; });
       }
     }
 
-    // positionRectLights: place 4 area lights at fixed angles around model center
+    // positionRectLights: arrange 4 rect lights symmetrically about model center
     function positionRectLights() {
       const radius = params.areaRadius;
       const elevation = params.areaElevation;
@@ -391,11 +340,7 @@
       for (let i = 0; i < rectLights.length; i++) {
         const a = angles[i];
         const rl = rectLights[i];
-
-        rl.width = params.areaWidth;
-        rl.height = params.areaHeight;
-        rl.intensity = params.areaIntensity;
-
+        rl.width = params.areaWidth; rl.height = params.areaHeight; rl.intensity = params.areaIntensity;
         rl.position.set(
           modelCenter.x + Math.cos(a) * radius,
           modelCenter.y + elevation,
@@ -405,27 +350,24 @@
       }
     }
 
-    // animation / render loop
+    // Render loop
     function animate(now) {
       requestAnimationFrame(animate);
 
-      // ensure rect lights reflect GUI & positioning
-      rectLights.forEach(rl => {
-        rl.intensity = params.areaIntensity;
-        rl.width = params.areaWidth;
-        rl.height = params.areaHeight;
-      });
+      // apply GUI-driven rect-light properties every frame
+      rectLights.forEach(rl => { rl.intensity = params.areaIntensity; rl.width = params.areaWidth; rl.height = params.areaHeight; });
       positionRectLights();
 
-      // ambient intensity already tied to exposure in applyExposure
+      // ambient already tied to exposure via applyExposure()
       controls.update();
       renderer.render(scene, camera);
     }
     requestAnimationFrame(animate);
 
-    // Apply initial exposure and double-sided if model loads after GUI
+    // Initial apply
     applyExposure();
     applyDoubleSided(params.doubleSided);
+    removeDirectionalLights();
 
     // Resize handling
     window.addEventListener('resize', () => {
