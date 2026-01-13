@@ -3,48 +3,54 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I Model - Material You Style</title>
+  <title>A.P.I Model</title>
   <style>
     html,body { height:100%; margin:0; background:#0b0b0b; overflow: hidden; }
     canvas { display:block; width:100%; height:100vh; }
 
     /* --- MATERIAL YOU GUI STYLING --- */
     .lil-gui { 
-      --background-color: rgba(28, 27, 31, 0.9);
+      --background-color: rgba(28, 27, 31, 0.92);
       --text-color: #e6e1e5;
       --title-background-color: transparent;
-      --widget-color: #4f378b; /* Primary accent */
+      --widget-color: #4f378b; 
       --hover-color: #6750a4;
       --focus-color: #d0bcff;
       --number-color: #d0bcff;
       --string-color: #d0bcff;
       
-      border-radius: 28px !important; /* Extra rounded for Material You */
-      padding: 16px !important;
+      border-radius: 28px !important; 
+      padding: 18px !important;
       border: none !important;
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
-      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+      backdrop-filter: blur(12px);
       font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     }
 
     .lil-gui .controller {
-      margin-bottom: 8px !important;
-      border-radius: 16px !important; /* Rounded inputs */
+      margin-bottom: 10px !important;
+      border-radius: 16px !important; 
       background: rgba(255, 255, 255, 0.05) !important;
-      padding: 4px 12px !important;
+      padding: 6px 12px !important;
+    }
+
+    /* Styling the Reset Button specifically */
+    .lil-gui .controller.button {
+      background: #d0bcff !important; /* Material Primary Light */
+      margin-top: 14px !important;
+      justify-content: center !important;
+    }
+    .lil-gui .controller.button .name {
+      color: #381e72 !important; /* On-Primary Dark Text */
+      font-weight: 800 !important;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .lil-gui .title {
-      font-weight: 600 !important;
-      font-size: 14px !important;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 10px !important;
+      font-weight: 700 !important;
       color: #d0bcff !important;
-    }
-
-    .lil-gui .slider {
-      border-radius: 10px !important;
+      letter-spacing: 1.2px;
     }
   </style>
 
@@ -72,7 +78,7 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.4; // Your default
+    renderer.toneMappingExposure = 0.4; 
     renderer.physicallyCorrectLights = true;
 
     const scene = new THREE.Scene();
@@ -84,7 +90,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- Omni Lighting (6 directions) ---
+    // --- Omni Lighting (Standardized) ---
     const ambient = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambient);
 
@@ -99,16 +105,39 @@
         scene.add(light);
     });
 
-    // --- State & Loader ---
-    const params = {
+    // --- Defaults & State ---
+    const defaults = {
       brightness: 0.4,
       background: '#0b0b0b',
       metalness: 0.0,
       roughness: 0.6
     };
 
-    let modelMaterials = []; // Keep a list for fast updates
+    let modelMaterials = [];
 
+    const params = {
+      ...defaults,
+      reset: function() {
+        // Reset the values in the object
+        params.brightness = defaults.brightness;
+        params.background = defaults.background;
+        params.metalness = defaults.metalness;
+        params.roughness = defaults.roughness;
+
+        // Apply back to the engine
+        renderer.toneMappingExposure = params.brightness;
+        scene.background.set(params.background);
+        modelMaterials.forEach(m => {
+          m.metalness = params.metalness;
+          m.roughness = params.roughness;
+        });
+
+        // Tell the GUI to refresh the visible sliders
+        gui.controllersRecursive().forEach(c => c.updateDisplay());
+      }
+    };
+
+    // --- Model Loading ---
     const loader = new GLTFLoader();
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
@@ -119,7 +148,7 @@
                 n.material.metalness = params.metalness;
                 n.material.roughness = params.roughness;
                 n.material.side = THREE.DoubleSide;
-                modelMaterials.push(n.material); // Save material reference
+                modelMaterials.push(n.material);
             }
         });
 
@@ -136,16 +165,12 @@
         controls.update();
     });
 
-    // --- Updated GUI with Sliders ---
-    const gui = new GUI({ title: 'A.P.I Studio' });
+    // --- GUI Setup ---
+    const gui = new GUI({ title: 'A.P.I STUDIO' });
 
     const sceneFolder = gui.addFolder('Environment');
-    sceneFolder.add(params, 'brightness', 0, 3).name('Exposure').onChange(v => {
-        renderer.toneMappingExposure = v;
-    });
-    sceneFolder.addColor(params, 'background').name('Background').onChange(v => {
-        scene.background.set(v);
-    });
+    sceneFolder.add(params, 'brightness', 0, 3).name('Exposure').onChange(v => renderer.toneMappingExposure = v);
+    sceneFolder.addColor(params, 'background').name('Background').onChange(v => scene.background.set(v));
 
     const materialFolder = gui.addFolder('Material Finish');
     materialFolder.add(params, 'metalness', 0, 1, 0.01).name('Metalness').onChange(v => {
@@ -154,6 +179,9 @@
     materialFolder.add(params, 'roughness', 0, 1, 0.01).name('Roughness').onChange(v => {
         modelMaterials.forEach(m => m.roughness = v);
     });
+
+    // Add the Reset Button at the bottom
+    gui.add(params, 'reset').name('Reset Defaults');
 
     function animate() {
         requestAnimationFrame(animate);
