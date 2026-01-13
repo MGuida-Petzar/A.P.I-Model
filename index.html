@@ -8,20 +8,23 @@
     html,body { height:100%; margin:0; background:#111; }
     canvas { display:block; width:100%; height:100vh; }
 
-    /* Material-You-like styling for lil-gui */
+    /* Material-You-like styling for lil-gui
+       NOTE: overflow is visible so color pickers / folder popouts are not clipped */
     .lil-gui, .dg {
       position: fixed !important;
       right: 20px;
       bottom: 20px;
       width: 300px !important;
       border-radius: 14px;
-      overflow: hidden;
+      /* Allow popups to overflow the container */
+      overflow: visible !important;
       box-shadow: 0 12px 30px rgba(2,6,23,0.6), inset 0 1px rgba(255,255,255,0.02);
       backdrop-filter: blur(8px) saturate(120%);
       background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
       color: #ffffff;
       font-family: "Roboto", "Google Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
       z-index: 10000;
+      pointer-events: auto;
     }
 
     /* Header accent pill like Material You */
@@ -37,7 +40,7 @@
       text-align: left;
     }
 
-    /* Make group/rows slightly transparent */
+    /* Slight background for controller rows */
     .lil-gui .controller, .dg .controller {
       background: rgba(255,255,255,0.02);
       margin: 6px 8px;
@@ -63,6 +66,14 @@
       margin: 6px 8px;
       padding: 6px;
     }
+
+    /* Ensure popovers and color pickers render above everything else */
+    .lil-gui .picker, .lil-gui .popup, .dg .picker, .dg .popup {
+      z-index: 11000 !important;
+    }
+
+    /* Slight pad so popups that open below the GUI aren't partially off-screen */
+    body { padding-bottom: 80px; }
   </style>
 
   <script type="importmap">
@@ -110,9 +121,8 @@
     const hemi = new THREE.HemisphereLight(0xffffff, 0x111122, 0.15);
     scene.add(hemi);
 
-    // RectAreaLights (studio softboxes)
+    // RectAreaLights
     RectAreaLightUniformsLib.init();
-
     const keyLight = new THREE.RectAreaLight(0xffffff, 6.0, 2.6, 1.2);
     keyLight.position.set(1.8, 1.6, 1.5);
     keyLight.lookAt(0, 0.2, 0);
@@ -128,7 +138,7 @@
     rimLight.lookAt(0, 0.2, 0);
     scene.add(rimLight);
 
-    // Directional light for crisp highlights
+    // Directional light
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.25);
     dirLight.position.set(5, 10, 7.5);
     dirLight.castShadow = true;
@@ -154,7 +164,7 @@
     const loader = new GLTFLoader();
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
-    // GUI params: doubleSided default true
+    // GUI params (doubleSided default true)
     const params = {
       exposure: 1.0,
       background: '#0b0b0b',
@@ -168,7 +178,7 @@
       rimIntensity: rimLight.intensity,
       dirIntensity: dirLight.intensity,
       shadows: true,
-      doubleSided: true, // enabled by default
+      doubleSided: true,
       showHelpers: false,
       axes: false
     };
@@ -180,7 +190,6 @@
       (gltf) => {
         const model = gltf.scene;
         loadedModel = model;
-
         model.traverse((n) => {
           if (n.isMesh) {
             n.castShadow = true;
@@ -200,11 +209,10 @@
 
         scene.add(model);
 
-        // Auto-frame camera
+        // Auto frame
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
-
         model.position.x += (model.position.x - center.x);
         model.position.y += (model.position.y - center.y);
         model.position.z += (model.position.z - center.z);
@@ -214,15 +222,11 @@
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
         cameraZ *= 1.6;
         camera.position.set(center.x, center.y + maxDim * 0.35, center.z + cameraZ);
-
         camera.near = Math.max(0.01, cameraZ / 1000);
         camera.far = cameraZ * 10;
         camera.updateProjectionMatrix();
-
         controls.target.copy(center);
         controls.update();
-
-        console.log('Model loaded. size:', size, 'center:', center);
       },
       (xhr) => {
         if (xhr.lengthComputable) {
@@ -241,13 +245,11 @@
     // Create a fresh GUI instance (styled via CSS above)
     const gui = new GUI({ title: 'Studio lights', width: 300 });
 
-    // Make sure the GUI is fixed bottom-right (defensive)
+    // Ensure the GUI is positioned bottom-right
     gui.domElement.style.position = 'fixed';
     gui.domElement.style.right = '20px';
     gui.domElement.style.bottom = '20px';
     gui.domElement.style.borderRadius = '14px';
-    gui.domElement.style.overflow = 'hidden';
-    gui.domElement.style.backdropFilter = 'blur(8px) saturate(120%)';
     gui.domElement.style.zIndex = '10000';
 
     // GUI controls
@@ -281,7 +283,7 @@
       renderer.shadowMap.enabled = v;
     });
 
-    // Double-sided control — default is true, and this handler toggles materials live
+    // Double-sided control — default is true
     gui.add(params, 'doubleSided').name('Double Sided').onChange(v => {
       if (!loadedModel) return;
       loadedModel.traverse((n) => {
@@ -300,7 +302,7 @@
 
     gui.add(params, 'axes').name('Show Axes').onChange(v => axes.visible = v);
 
-    // Animation loop
+    // Render loop
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
