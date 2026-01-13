@@ -147,10 +147,10 @@
       elevation: 1.2  // vertical offset
     };
 
-    // create 4 RectAreaLights at 0,90,180,270 degrees
     for (let i = 0; i < 4; i++) {
       const rl = new THREE.RectAreaLight(0xffffff, rectParams.intensity, rectParams.width, rectParams.height);
-      rl.castShadow = false; // area lights do not cast conventional shadows easily in three.js; directional will handle crisp shadows
+      // RectAreaLight doesn't cast typical shadows in three.js, leave as false
+      rl.castShadow = false;
       rectLights.push(rl);
       scene.add(rl);
     }
@@ -171,7 +171,7 @@
 
     // --- Loader + model ---
     const loader = new GLTFLoader();
-    // model URL as you requested earlier:
+    // model URL per your request:
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
     let loadedModel = null;
@@ -185,10 +185,7 @@
           if (n.isMesh) {
             n.castShadow = true;
             n.receiveShadow = true;
-            // Ensure the material uses normal maps / PBR if available - leave as-is otherwise
-            if (n.material) {
-              n.material.needsUpdate = true;
-            }
+            if (n.material) n.material.needsUpdate = true;
           }
         });
 
@@ -214,7 +211,10 @@
         controls.target.copy(modelCenter);
         controls.update();
 
-        // position rect lights around the model (even lighting)
+        // apply double-sided state immediately (fix for checkbox behavior)
+        applyDoubleSided(params.doubleSided);
+
+        // position rect lights once center known
         positionRectLights();
       },
       (xhr) => { if (xhr.lengthComputable) console.log(`Model ${(xhr.loaded/xhr.total*100).toFixed(1)}% loaded`); },
@@ -229,10 +229,10 @@
       exposure: 1.5,
       background: '#0b0b0b',
       shadows: true,
-      doubleSided: true,
+      doubleSided: true, // default true
       showHelpers: false,
       axes: false,
-      // light tuning
+      // area light tuning
       areaWidth: rectParams.width,
       areaHeight: rectParams.height,
       areaIntensity: rectParams.intensity,
@@ -248,80 +248,123 @@
     gui.domElement.style.zIndex = '10000';
     const defaultTitle = gui.domElement.querySelector('.title'); if (defaultTitle) defaultTitle.remove();
 
-    // Exposure
-    gui.add(params, 'exposure', 0.5, 3.0, 0.01).name('exposure').onChange(v => {
+    // Keep references to controllers so we can programmatically set GUI values for the "flat" button
+    const exposureCtrl = gui.add(params, 'exposure', 0.5, 3.0, 0.01).name('exposure').onChange(v => {
       renderer.toneMappingExposure = v;
     });
 
-    // Background color
-    gui.addColor(params, 'background').name('background').onChange(v => {
+    const backgroundCtrl = gui.addColor(params, 'background').name('background').onChange(v => {
       scene.background.set(v);
     });
 
-    // Shadows toggle
-    gui.add(params, 'shadows').name('shadows').onChange(v => {
+    const shadowsCtrl = gui.add(params, 'shadows').name('shadows').onChange(v => {
       renderer.shadowMap.enabled = v;
     });
 
-    // Double sided control
-    gui.add(params, 'doubleSided').name('double sided').onChange(v => {
-      if (!loadedModel) return;
-      loadedModel.traverse(n => {
-        if (n.isMesh && n.material) {
-          n.material.side = v ? THREE.DoubleSide : THREE.FrontSide;
-          n.material.needsUpdate = true;
-        }
-      });
+    // Double sided controller (fix: apply immediately and expose handler)
+    const doubleCtrl = gui.add(params, 'doubleSided').name('double sided').onChange(v => {
+      applyDoubleSided(v);
     });
 
-    // Helpers and axes
-    gui.add(params, 'showHelpers').name('show light helpers').onChange(v => {
-      // no area light helpers by default; show axes instead
+    // Helpers and axes toggles
+    const helpersCtrl = gui.add(params, 'showHelpers').name('show light helpers').onChange(v => {
+      // show simple translucent helper planes
       rectHelpers.forEach(h => scene.remove(h));
       rectHelpers.length = 0;
       if (v) {
-        // add visible simple helpers for each rect light
         rectLights.forEach(rl => {
-          const helper = new THREE.Mesh(new THREE.PlaneGeometry(rl.width, rl.height), new THREE.MeshBasicMaterial({ color: 0xffff00, opacity: 0.08, transparent: true }));
+          const helper = new THREE.Mesh(
+            new THREE.PlaneGeometry(rl.width, rl.height),
+            new THREE.MeshBasicMaterial({ color: 0xffff00, opacity: 0.06, transparent: true })
+          );
           helper.position.copy(rl.position);
           helper.lookAt(modelCenter);
           rectHelpers.push(helper);
           scene.add(helper);
         });
-      } else {
-        rectHelpers.forEach(h => scene.remove(h));
-        rectHelpers.length = 0;
       }
     });
 
-    gui.add(params, 'axes').name('show axes').onChange(v => {
+    const axesCtrl = gui.add(params, 'axes').name('show axes').onChange(v => {
       axes.visible = v;
     });
 
     // Light folder
     const lightFolder = gui.addFolder('light');
-    lightFolder.add(params, 'areaWidth', 0.2, 4.0, 0.01).name('area width').onChange(v => {
+    const areaWidthCtrl = lightFolder.add(params, 'areaWidth', 0.2, 4.0, 0.01).name('area width').onChange(v => {
       rectLights.forEach(rl => rl.width = v);
+      positionRectLights();
     });
-    lightFolder.add(params, 'areaHeight', 0.2, 3.0, 0.01).name('area height').onChange(v => {
+    const areaHeightCtrl = lightFolder.add(params, 'areaHeight', 0.2, 3.0, 0.01).name('area height').onChange(v => {
       rectLights.forEach(rl => rl.height = v);
+      positionRectLights();
     });
-    lightFolder.add(params, 'areaIntensity', 0, 12, 0.01).name('area intensity').onChange(v => {
+    const areaIntensityCtrl = lightFolder.add(params, 'areaIntensity', 0, 12, 0.01).name('area intensity').onChange(v => {
       rectLights.forEach(rl => rl.intensity = v);
     });
-    lightFolder.add(params, 'areaRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => {
+    const areaRadiusCtrl = lightFolder.add(params, 'areaRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => {
       positionRectLights();
     });
-    lightFolder.add(params, 'areaElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => {
+    const areaElevationCtrl = lightFolder.add(params, 'areaElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => {
       positionRectLights();
     });
-    lightFolder.add(params, 'dirIntensity', 0, 4, 0.01).name('dir intensity').onChange(v => {
+    const dirIntensityCtrl = lightFolder.add(params, 'dirIntensity', 0, 4, 0.01).name('dir intensity').onChange(v => {
       dirLight.intensity = v;
     });
     lightFolder.close();
 
-    // Ensure popups above gui
+    // Flat / fully even-lit button (one-click preset)
+    const actions = {
+      flat: () => {
+        // set parameters for fully even-lit
+        params.exposure = 1.6;
+        params.background = '#0b0b0b';
+        params.shadows = false;
+        params.doubleSided = true;
+        params.areaIntensity = 8.0;
+        params.areaRadius = 0.9;
+        params.areaElevation = 1.2;
+        params.areaWidth = 3.0;
+        params.areaHeight = 1.6;
+        params.dirIntensity = 0.0;
+
+        // apply changes immediately
+        exposureCtrl.setValue(params.exposure);
+        backgroundCtrl.setValue(params.background);
+        shadowsCtrl.setValue(params.shadows);
+        doubleCtrl.setValue(params.doubleSided);
+        areaIntensityCtrl.setValue(params.areaIntensity);
+        areaRadiusCtrl.setValue(params.areaRadius);
+        areaElevationCtrl.setValue(params.areaElevation);
+        areaWidthCtrl.setValue(params.areaWidth);
+        areaHeightCtrl.setValue(params.areaHeight);
+        dirIntensityCtrl.setValue(params.dirIntensity);
+
+        // also apply values programmatically (in case GUI doesn't trigger)
+        renderer.toneMappingExposure = params.exposure;
+        renderer.shadowMap.enabled = params.shadows;
+        applyDoubleSided(params.doubleSided);
+        rectLights.forEach(rl => { rl.intensity = params.areaIntensity; rl.width = params.areaWidth; rl.height = params.areaHeight; });
+        positionRectLights();
+        dirLight.intensity = params.dirIntensity;
+      }
+    };
+
+    gui.add(actions, 'flat').name('flat even-lit');
+
+    // Ensure pickers/popovers are above
     gui.domElement.querySelectorAll('.picker, .popup').forEach(el => el.style.zIndex = '11000');
+
+    // Helper: apply double-sided to model materials
+    function applyDoubleSided(enabled) {
+      if (!loadedModel) return;
+      loadedModel.traverse(n => {
+        if (n.isMesh && n.material) {
+          n.material.side = enabled ? THREE.DoubleSide : THREE.FrontSide;
+          n.material.needsUpdate = true;
+        }
+      });
+    }
 
     // positionRectLights: place 4 area lights at fixed angles around model center
     function positionRectLights() {
@@ -343,7 +386,7 @@
         rl.lookAt(modelCenter);
       }
 
-      // also update directional target to center
+      // update directional target to center
       if (dirLight.target) {
         dirLight.target.position.set(modelCenter.x, modelCenter.y, modelCenter.z);
         scene.add(dirLight.target);
@@ -359,11 +402,15 @@
       // ensure intensities used
       rectLights.forEach(rl => rl.intensity = params.areaIntensity);
       dirLight.intensity = params.dirIntensity;
+      ambient.intensity = params.exposure * 0.8; // tie ambient to exposure a bit for easy brightening
 
       controls.update();
       renderer.render(scene, camera);
     }
     requestAnimationFrame(animate);
+
+    // Ensure initial double-sided is applied (in case model already loaded earlier)
+    applyDoubleSided(params.doubleSided);
 
     // Resize handling
     window.addEventListener('resize', () => {
