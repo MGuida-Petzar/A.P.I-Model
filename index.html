@@ -112,7 +112,7 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.5; // default exposure
+    renderer.toneMappingExposure = 1.5;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.physicallyCorrectLights = true;
@@ -146,14 +146,7 @@
       scene.add(rl);
     }
 
-    // directional kept for optional depth; will be hidden by flat preset
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    dirLight.position.set(5, 8, 5);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.set(1024, 1024);
-    dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 50;
-    scene.add(dirLight);
+    // NOTE: directional light removed entirely to ensure truly flat/even lighting
 
     const axes = new THREE.AxesHelper(0.5);
     axes.visible = false;
@@ -161,7 +154,6 @@
 
     // --- Loader + model ---
     const loader = new GLTFLoader();
-    // model URL per your previous request:
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
     let loadedModel = null;
@@ -173,8 +165,8 @@
         loadedModel = model;
         model.traverse(n => {
           if (n.isMesh) {
-            n.castShadow = true;
-            n.receiveShadow = true;
+            n.castShadow = false; // shadows off for fully even lighting effect by default
+            n.receiveShadow = false;
             if (n.material) n.material.needsUpdate = true;
           }
         });
@@ -201,7 +193,7 @@
         controls.target.copy(modelCenter);
         controls.update();
 
-        // apply double-sided if requested
+        // apply double-sided state if set
         applyDoubleSided(params.doubleSided);
 
         // position rect lights now that center is known
@@ -216,9 +208,10 @@
 
     // --- GUI params ---
     const params = {
+      // exposure will be changed only by the brighten/darken buttons (0..20 cap)
       exposure: renderer.toneMappingExposure,
       background: '#0b0b0b',
-      shadows: true,
+      shadows: false,
       doubleSided: true,
       showHelpers: false,
       axes: false,
@@ -227,7 +220,7 @@
       areaIntensity: rectDefaults.intensity,
       areaRadius: rectDefaults.radius,
       areaElevation: rectDefaults.elevation,
-      dirIntensity: dirLight.intensity
+      dirIntensity: 0 // removed directional light; keep param for legacy but unused
     };
 
     const gui = new GUI({ width: 220 });
@@ -237,30 +230,35 @@
     gui.domElement.style.zIndex = '10000';
     const defaultTitle = gui.domElement.querySelector('.title'); if (defaultTitle) defaultTitle.remove();
 
-    // Keep references to controllers so we can set values programmatically
-    const exposureCtrl = gui.add(params, 'exposure', 0.2, 4.0, 0.01).name('exposure').onChange(v => {
-      renderer.toneMappingExposure = v;
-      // match ambient a bit so exposure slider makes the scene brighter visually
-      ambient.intensity = Math.max(0.1, v * 0.8);
-    });
+    // NOTE: original exposure slider removed as requested.
+    // We'll provide "brighter +" / "darker -" actions and a new exposure display controller (read-only style).
 
+    // Background color
     const backgroundCtrl = gui.addColor(params, 'background').name('background').onChange(v => {
       scene.background.set(v);
     });
 
+    // Shadows toggle (kept but default off)
     const shadowsCtrl = gui.add(params, 'shadows').name('shadows').onChange(v => {
       renderer.shadowMap.enabled = v;
-      // also toggle directional shadows for clarity
-      dirLight.castShadow = !!v;
+      // If user enables shadows, enable receive/cast shadows on meshes
+      if (loadedModel) {
+        loadedModel.traverse(n => {
+          if (n.isMesh) {
+            n.castShadow = !!v;
+            n.receiveShadow = !!v;
+          }
+        });
+      }
     });
 
-    // Double sided controller and fixer
+    // Double sided controller (fixed: apply immediately)
     const doubleCtrl = gui.add(params, 'doubleSided').name('double sided').onChange(v => {
       applyDoubleSided(v);
     });
 
+    // Helpers and axes toggles
     const helpersCtrl = gui.add(params, 'showHelpers').name('show light helpers').onChange(v => {
-      // show translucent rectangle helpers positioned on lights
       rectHelpers.forEach(h => scene.remove(h));
       rectHelpers.length = 0;
       if (v) {
@@ -291,7 +289,7 @@
       rectLights.forEach(rl => rl.height = v);
       positionRectLights();
     });
-    const areaIntensityCtrl = lightFolder.add(params, 'areaIntensity', 0, 20, 0.01).name('area intensity').onChange(v => {
+    const areaIntensityCtrl = lightFolder.add(params, 'areaIntensity', 0, 40, 0.01).name('area intensity').onChange(v => {
       rectLights.forEach(rl => rl.intensity = v);
     });
     const areaRadiusCtrl = lightFolder.add(params, 'areaRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => {
@@ -300,80 +298,62 @@
     const areaElevationCtrl = lightFolder.add(params, 'areaElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => {
       positionRectLights();
     });
-    const dirIntensityCtrl = lightFolder.add(params, 'dirIntensity', 0, 4, 0.01).name('dir intensity').onChange(v => {
-      dirLight.intensity = v;
-      // ensure directional is visible when intensity > 0
-      dirLight.visible = v > 0;
-    });
     lightFolder.close();
 
-    // Flat / fully even-lit button (one-click preset) - now removes directional light completely
+    // Brightness controls: remove top exposure slider; add buttons and a read-only display for current exposure
+    // read-only-ish display (we use a fake controller to show numeric value)
+    const exposureDisplay = { exposureValue: params.exposure };
+    const exposureDisplayCtrl = gui.add(exposureDisplay, 'exposureValue').name('exposure').listen();
+
     const actions = {
+      brighter: () => {
+        params.exposure = Math.min(20.0, Math.round((params.exposure + 0.5) * 100) / 100);
+        applyExposure();
+      },
+      darker: () => {
+        params.exposure = Math.max(0.0, Math.round((params.exposure - 0.5) * 100) / 100);
+        applyExposure();
+      },
       flat: () => {
-        // set parameters for fully even-lit (directional fully disabled)
-        params.exposure = 2.0;
-        params.background = '#0b0b0b';
+        // fully even-lit preset: remove any directional influence and make area lights bright
         params.shadows = false;
-        params.doubleSided = true;
-        params.areaIntensity = 12.0;
-        params.areaRadius = 0.8;
-        params.areaElevation = 1.2;
-        params.areaWidth = 3.0;
-        params.areaHeight = 1.6;
-        params.dirIntensity = 0.0;
-
-        // apply changes to GUI values (updates controls visually)
-        exposureCtrl.setValue(params.exposure);
-        backgroundCtrl.setValue(params.background);
         shadowsCtrl.setValue(params.shadows);
-        doubleCtrl.setValue(params.doubleSided);
-        areaIntensityCtrl.setValue(params.areaIntensity);
-        areaRadiusCtrl.setValue(params.areaRadius);
-        areaElevationCtrl.setValue(params.areaElevation);
-        areaWidthCtrl.setValue(params.areaWidth);
-        areaHeightCtrl.setValue(params.areaHeight);
-        dirIntensityCtrl.setValue(params.dirIntensity);
 
-        // apply programmatically to ensure immediate result
-        renderer.toneMappingExposure = params.exposure;
-        ambient.intensity = Math.max(0.1, params.exposure * 0.8);
-        renderer.shadowMap.enabled = params.shadows;
+        params.doubleSided = true;
+        doubleCtrl.setValue(params.doubleSided);
         applyDoubleSided(params.doubleSided);
 
+        params.areaIntensity = 20.0;
+        areaIntensityCtrl.setValue(params.areaIntensity);
+
+        params.areaRadius = 0.6;
+        areaRadiusCtrl.setValue(params.areaRadius);
+
+        params.areaWidth = 3.4;
+        areaWidthCtrl.setValue(params.areaWidth);
+
+        params.areaHeight = 1.6;
+        areaHeightCtrl.setValue(params.areaHeight);
+
+        // set exposure high and clamp to 20
+        params.exposure = 8.0;
+        applyExposure();
+
+        // ensure rect lights positioned and applied
         rectLights.forEach(rl => {
           rl.intensity = params.areaIntensity;
           rl.width = params.areaWidth;
           rl.height = params.areaHeight;
         });
         positionRectLights();
-
-        // Disable directional light entirely for the flat preset
-        dirLight.intensity = 0;
-        dirLight.visible = false;
-      },
-
-      // Brighter quick button: increases exposure by +0.5 (clamped)
-      brighten: () => {
-        params.exposure = Math.min(4.0, params.exposure + 0.5);
-        exposureCtrl.setValue(params.exposure);
-        renderer.toneMappingExposure = params.exposure;
-        ambient.intensity = Math.max(0.1, params.exposure * 0.8);
-      },
-
-      // Dim quick button: decreases exposure by -0.5 (clamped)
-      darken: () => {
-        params.exposure = Math.max(0.2, params.exposure - 0.5);
-        exposureCtrl.setValue(params.exposure);
-        renderer.toneMappingExposure = params.exposure;
-        ambient.intensity = Math.max(0.1, params.exposure * 0.8);
       }
     };
 
     gui.add(actions, 'flat').name('flat even-lit');
-    gui.add(actions, 'brighten').name('brighter +');
-    gui.add(actions, 'darken').name('darker -');
+    gui.add(actions, 'brighter').name('brighter +');
+    gui.add(actions, 'darker').name('darker -');
 
-    // Ensure pickers/popovers are above gui
+    // Ensure popovers above GUI
     gui.domElement.querySelectorAll('.picker, .popup').forEach(el => el.style.zIndex = '11000');
 
     // Helper: apply double-sided to model materials
@@ -385,6 +365,22 @@
           n.material.needsUpdate = true;
         }
       });
+    }
+
+    // Apply exposure value to renderer and tie to ambient intensity
+    function applyExposure() {
+      // clamp and apply
+      params.exposure = Math.min(20.0, Math.max(0.0, params.exposure));
+      renderer.toneMappingExposure = params.exposure;
+      // make ambient scale with exposure so it brightens the whole model
+      ambient.intensity = Math.max(0.01, params.exposure * 0.7);
+      exposureDisplay.exposureValue = params.exposure;
+      // ensure meshes update if needed
+      if (loadedModel) {
+        loadedModel.traverse(n => {
+          if (n.isMesh && n.material) n.material.needsUpdate = true;
+        });
+      }
     }
 
     // positionRectLights: place 4 area lights at fixed angles around model center
@@ -407,12 +403,6 @@
         );
         rl.lookAt(modelCenter);
       }
-
-      // directional should target center if visible
-      if (dirLight.target) {
-        dirLight.target.position.set(modelCenter.x, modelCenter.y, modelCenter.z);
-        scene.add(dirLight.target);
-      }
     }
 
     // animation / render loop
@@ -427,19 +417,14 @@
       });
       positionRectLights();
 
-      // apply directional intensity and visibility
-      dirLight.intensity = params.dirIntensity;
-      dirLight.visible = params.dirIntensity > 0;
-
-      // ambient ties to exposure a bit
-      ambient.intensity = Math.max(0.05, params.exposure * 0.8);
-
+      // ambient intensity already tied to exposure in applyExposure
       controls.update();
       renderer.render(scene, camera);
     }
     requestAnimationFrame(animate);
 
-    // Apply initial double-sided (defensive)
+    // Apply initial exposure and double-sided if model loads after GUI
+    applyExposure();
     applyDoubleSided(params.doubleSided);
 
     // Resize handling
