@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I Model</title>
+  <title>A.P.I Model - Polished Material You</title>
   <style>
     html,body { height:100%; margin:0; background:#0b0b0b; overflow: hidden; }
     canvas { display:block; width:100%; height:100vh; }
@@ -19,38 +19,49 @@
       --number-color: #d0bcff;
       --string-color: #d0bcff;
       
-      border-radius: 28px !important; 
-      padding: 18px !important;
+      border-radius: 32px !important; /* Extra rounded container */
+      padding: 20px !important;
       border: none !important;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
+      backdrop-filter: blur(14px);
       font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     }
 
     .lil-gui .controller {
-      margin-bottom: 10px !important;
-      border-radius: 16px !important; 
+      margin-bottom: 12px !important;
+      border-radius: 20px !important; 
       background: rgba(255, 255, 255, 0.05) !important;
-      padding: 6px 12px !important;
+      padding: 8px 14px !important;
     }
 
-    /* Styling the Reset Button specifically */
+    /* --- PILL-SHAPED ROUND RESET BUTTON --- */
     .lil-gui .controller.button {
-      background: #d0bcff !important; /* Material Primary Light */
-      margin-top: 14px !important;
+      background: #d0bcff !important; 
+      border-radius: 40px !important; /* Fully round/pill shape */
+      margin-top: 18px !important;
       justify-content: center !important;
+      height: 44px !important; /* Slightly taller for better tap area */
+      transition: transform 0.1s ease, background 0.2s ease;
+      cursor: pointer;
     }
+    
+    .lil-gui .controller.button:active {
+      transform: scale(0.96); /* Tactile press effect */
+      background: #b6a3e5 !important;
+    }
+
     .lil-gui .controller.button .name {
-      color: #381e72 !important; /* On-Primary Dark Text */
-      font-weight: 800 !important;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      color: #381e72 !important; 
+      font-weight: 700 !important;
+      text-transform: none; /* Material You usually uses Title Case */
+      font-size: 14px;
     }
 
     .lil-gui .title {
       font-weight: 700 !important;
       color: #d0bcff !important;
-      letter-spacing: 1.2px;
+      letter-spacing: 0.8px;
+      padding-left: 4px;
     }
   </style>
 
@@ -71,7 +82,7 @@
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
-    // --- Renderer Setup ---
+    // --- Renderer ---
     const canvas = document.getElementById('canvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -90,7 +101,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- Omni Lighting (Standardized) ---
+    // --- Omni Lighting ---
     const ambient = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambient);
 
@@ -105,11 +116,11 @@
         scene.add(light);
     });
 
-    // --- Defaults & State ---
+    // --- DEFAULTS (Metalness now 1.0) ---
     const defaults = {
       brightness: 0.4,
       background: '#0b0b0b',
-      metalness: 0.0,
+      metalness: 1.0, 
       roughness: 0.6
     };
 
@@ -118,13 +129,11 @@
     const params = {
       ...defaults,
       reset: function() {
-        // Reset the values in the object
         params.brightness = defaults.brightness;
         params.background = defaults.background;
         params.metalness = defaults.metalness;
         params.roughness = defaults.roughness;
 
-        // Apply back to the engine
         renderer.toneMappingExposure = params.brightness;
         scene.background.set(params.background);
         modelMaterials.forEach(m => {
@@ -132,12 +141,11 @@
           m.roughness = params.roughness;
         });
 
-        // Tell the GUI to refresh the visible sliders
         gui.controllersRecursive().forEach(c => c.updateDisplay());
       }
     };
 
-    // --- Model Loading ---
+    // --- Loader ---
     const loader = new GLTFLoader();
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
@@ -145,6 +153,7 @@
         const model = gltf.scene;
         model.traverse(n => {
             if (n.isMesh && n.material) {
+                // Apply defaults on load
                 n.material.metalness = params.metalness;
                 n.material.roughness = params.roughness;
                 n.material.side = THREE.DoubleSide;
@@ -166,7 +175,7 @@
     });
 
     // --- GUI Setup ---
-    const gui = new GUI({ title: 'A.P.I STUDIO' });
+    const gui = new GUI({ title: 'A.P.I Studio' });
 
     const sceneFolder = gui.addFolder('Environment');
     sceneFolder.add(params, 'brightness', 0, 3).name('Exposure').onChange(v => renderer.toneMappingExposure = v);
@@ -180,8 +189,7 @@
         modelMaterials.forEach(m => m.roughness = v);
     });
 
-    // Add the Reset Button at the bottom
-    gui.add(params, 'reset').name('Reset Defaults');
+    gui.add(params, 'reset').name('Reset to Defaults');
 
     function animate() {
         requestAnimationFrame(animate);
