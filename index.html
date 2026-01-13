@@ -3,11 +3,49 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I Model</title>
+  <title>A.P.I Model - Material You Style</title>
   <style>
-    html,body { height:100%; margin:0; background:#0b0b0b; }
+    html,body { height:100%; margin:0; background:#0b0b0b; overflow: hidden; }
     canvas { display:block; width:100%; height:100vh; }
-    .lil-gui { --background-color: #222; --text-color: #eee; }
+
+    /* --- MATERIAL YOU GUI STYLING --- */
+    .lil-gui { 
+      --background-color: rgba(28, 27, 31, 0.9);
+      --text-color: #e6e1e5;
+      --title-background-color: transparent;
+      --widget-color: #4f378b; /* Primary accent */
+      --hover-color: #6750a4;
+      --focus-color: #d0bcff;
+      --number-color: #d0bcff;
+      --string-color: #d0bcff;
+      
+      border-radius: 28px !important; /* Extra rounded for Material You */
+      padding: 16px !important;
+      border: none !important;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
+      backdrop-filter: blur(10px);
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    }
+
+    .lil-gui .controller {
+      margin-bottom: 8px !important;
+      border-radius: 16px !important; /* Rounded inputs */
+      background: rgba(255, 255, 255, 0.05) !important;
+      padding: 4px 12px !important;
+    }
+
+    .lil-gui .title {
+      font-weight: 600 !important;
+      font-size: 14px !important;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px !important;
+      color: #d0bcff !important;
+    }
+
+    .lil-gui .slider {
+      border-radius: 10px !important;
+    }
   </style>
 
   <script type="importmap">
@@ -27,16 +65,14 @@
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
+    // --- Renderer Setup ---
     const canvas = document.getElementById('canvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    
-    // --- DEFAULT BRIGHTNESS ---
-    renderer.toneMappingExposure = 0.4; 
-    
+    renderer.toneMappingExposure = 0.4; // Your default
     renderer.physicallyCorrectLights = true;
 
     const scene = new THREE.Scene();
@@ -48,6 +84,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
+    // --- Omni Lighting (6 directions) ---
     const ambient = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambient);
 
@@ -56,12 +93,21 @@
         new THREE.Vector3(10, 0, 0), new THREE.Vector3(-10, 0, 0),
         new THREE.Vector3(0, 0, 10), new THREE.Vector3(0, 0, -10)
     ];
-
     directions.forEach(dir => {
         const light = new THREE.DirectionalLight(0xffffff, 0.5);
         light.position.copy(dir);
         scene.add(light);
     });
+
+    // --- State & Loader ---
+    const params = {
+      brightness: 0.4,
+      background: '#0b0b0b',
+      metalness: 0.0,
+      roughness: 0.6
+    };
+
+    let modelMaterials = []; // Keep a list for fast updates
 
     const loader = new GLTFLoader();
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
@@ -69,47 +115,44 @@
     loader.load(modelUrl, (gltf) => {
         const model = gltf.scene;
         model.traverse(n => {
-            if (n.isMesh) {
-                n.castShadow = false;
-                n.receiveShadow = false;
-                
-                if (n.material) {
-                    // -------------------------------------------------------
-                    // EXPERIMENT HERE: Metalness and Roughness
-                    // -------------------------------------------------------
-                    n.material.metalness = 1.0;  // 0.0 = Plastic/Matte, 1.0 = Fully Metallic
-                    n.material.roughness = 0.6;  // 0.0 = Mirror smooth, 1.0 = Very rough/Flat
-                    // -------------------------------------------------------
-                    
-                    n.material.side = THREE.DoubleSide;
-                    n.material.needsUpdate = true;
-                }
+            if (n.isMesh && n.material) {
+                n.material.metalness = params.metalness;
+                n.material.roughness = params.roughness;
+                n.material.side = THREE.DoubleSide;
+                modelMaterials.push(n.material); // Save material reference
             }
         });
 
         scene.add(model);
         const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
-        const modelCenter = box.getCenter(new THREE.Vector3());
-        model.position.sub(modelCenter);
+        model.position.sub(center);
         
         const maxDim = Math.max(size.x, size.y, size.z);
-        const fov = camera.fov * (Math.PI / 180);
-        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-        camera.position.set(0, maxDim * 0.2, cameraZ * 2.0);
-        camera.updateProjectionMatrix();
+        const cameraZ = Math.abs(maxDim / 2 / Math.tan((camera.fov * Math.PI / 180) / 2));
+        camera.position.set(0, maxDim * 0.2, cameraZ * 2.2);
         controls.target.set(0,0,0);
         controls.update();
     });
 
-    const gui = new GUI();
-    const params = { brightness: 0.4, background: '#0b0b0b' };
-    
-    gui.add(params, 'brightness', 0, 3).name('Brightness').onChange(v => {
+    // --- Updated GUI with Sliders ---
+    const gui = new GUI({ title: 'A.P.I Studio' });
+
+    const sceneFolder = gui.addFolder('Environment');
+    sceneFolder.add(params, 'brightness', 0, 3).name('Exposure').onChange(v => {
         renderer.toneMappingExposure = v;
     });
-    gui.addColor(params, 'background').name('Background').onChange(v => {
+    sceneFolder.addColor(params, 'background').name('Background').onChange(v => {
         scene.background.set(v);
+    });
+
+    const materialFolder = gui.addFolder('Material Finish');
+    materialFolder.add(params, 'metalness', 0, 1, 0.01).name('Metalness').onChange(v => {
+        modelMaterials.forEach(m => m.metalness = v);
+    });
+    materialFolder.add(params, 'roughness', 0, 1, 0.01).name('Roughness').onChange(v => {
+        modelMaterials.forEach(m => m.roughness = v);
     });
 
     function animate() {
@@ -127,4 +170,3 @@
   </script>
 </body>
 </html>
-
