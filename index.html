@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I-Model — Studio Lighting + Custom GUI</title>
+  <title>A.P.I-Model — Bright Even Lighting + Custom GUI</title>
   <style>
     html,body { height:100%; margin:0; background:#0b0b0b; }
     canvas { display:block; width:100%; height:100vh; }
@@ -103,7 +103,6 @@
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/loaders/GLTFLoader.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import { RectAreaLightUniformsLib } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/lights/RectAreaLightUniformsLib.js';
-    import { RectAreaLightHelper } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/helpers/RectAreaLightHelper.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
     // --- Renderer & scene ---
@@ -113,9 +112,10 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.5; // brighten overall
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.physicallyCorrectLights = true;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0b0b);
@@ -125,60 +125,70 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- Lights ---
-    const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+    // --- Bright, even lighting setup ---
+    // Strong ambient & hemisphere to remove deep shadows
+    const ambient = new THREE.AmbientLight(0xffffff, 1.2); // bright ambient
     scene.add(ambient);
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x111122, 0.15);
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0xaaaaaa, 0.6);
     scene.add(hemi);
 
+    // RectAreaLights: place 4 around the model (front, right, back, left) to light from all sides
     RectAreaLightUniformsLib.init();
-    const keyLight = new THREE.RectAreaLight(0xffffff, 1.0, 2.6, 1.2);
-    const fillLight = new THREE.RectAreaLight(0xffffff, 1.0, 2.2, 1.0);
-    const rimLight = new THREE.RectAreaLight(0xffffff, 1.0, 1.6, 1.0);
-    // set castShadow for main key/dir if desired
-    keyLight.castShadow = true;
-    scene.add(keyLight, fillLight, rimLight);
 
-    // Make directional light similar brightness so it matches
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    dirLight.position.set(5, 10, 7.5);
+    const rectLights = [];
+    const rectHelpers = [];
+
+    const rectParams = {
+      width: 2.6,
+      height: 1.2,
+      intensity: 3.0, // bright
+      radius: 1.2,    // how close to model
+      elevation: 1.2  // vertical offset
+    };
+
+    // create 4 RectAreaLights at 0,90,180,270 degrees
+    for (let i = 0; i < 4; i++) {
+      const rl = new THREE.RectAreaLight(0xffffff, rectParams.intensity, rectParams.width, rectParams.height);
+      rl.castShadow = false; // area lights do not cast conventional shadows easily in three.js; directional will handle crisp shadows
+      rectLights.push(rl);
+      scene.add(rl);
+    }
+
+    // Add a directional to preserve some depth/shadow but keep it moderate
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(5, 8, 5);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.mapSize.set(1024, 1024);
     dirLight.shadow.camera.near = 0.5;
     dirLight.shadow.camera.far = 50;
     scene.add(dirLight);
 
-    const keyHelper = new RectAreaLightHelper(keyLight);
-    const fillHelper = new RectAreaLightHelper(fillLight);
-    const rimHelper = new RectAreaLightHelper(rimLight);
-    keyHelper.visible = false; fillHelper.visible = false; rimHelper.visible = false;
-    scene.add(keyHelper, fillHelper, rimHelper);
-
+    // Keep a small helper axis
     const axes = new THREE.AxesHelper(0.5);
     axes.visible = false;
     scene.add(axes);
 
     // --- Loader + model ---
     const loader = new GLTFLoader();
-    // model URL as you requested:
+    // model URL as you requested earlier:
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
     let loadedModel = null;
-    let modelCenter = new THREE.Vector3(0,0,0);
+    let modelCenter = new THREE.Vector3(0, 0, 0);
 
     loader.load(modelUrl,
       (gltf) => {
         const model = gltf.scene;
         loadedModel = model;
         model.traverse(n => {
-          if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; }
-        });
-
-        // default double sided applied when model loads (true)
-        model.traverse(n => {
-          if (n.isMesh && n.material) {
-            n.material.side = THREE.DoubleSide;
-            n.material.needsUpdate = true;
+          if (n.isMesh) {
+            n.castShadow = true;
+            n.receiveShadow = true;
+            // Ensure the material uses normal maps / PBR if available - leave as-is otherwise
+            if (n.material) {
+              n.material.needsUpdate = true;
+            }
           }
         });
 
@@ -188,24 +198,24 @@
         const size = box.getSize(new THREE.Vector3());
         modelCenter.copy(box.getCenter(new THREE.Vector3()));
 
-        // recenter model
+        // recenter model to origin
         model.position.x += (model.position.x - modelCenter.x);
         model.position.y += (model.position.y - modelCenter.y);
         model.position.z += (model.position.z - modelCenter.z);
 
-        const maxDim = Math.max(size.x,size.y,size.z);
-        const fov = camera.fov * (Math.PI/180);
-        let cameraZ = Math.abs(maxDim/2 / Math.tan(fov/2));
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
         cameraZ *= 1.6;
-        camera.position.set(modelCenter.x, modelCenter.y + maxDim*0.35, modelCenter.z + cameraZ);
-        camera.near = Math.max(0.01, cameraZ/1000);
-        camera.far = cameraZ*10;
+        camera.position.set(modelCenter.x, modelCenter.y + maxDim * 0.35, modelCenter.z + cameraZ);
+        camera.near = Math.max(0.01, cameraZ / 1000);
+        camera.far = cameraZ * 10;
         camera.updateProjectionMatrix();
         controls.target.copy(modelCenter);
         controls.update();
 
-        // set initial light positions (after center known)
-        updateLightPositions(params.lightOrbit, params.lightRadius, params.lightElevation);
+        // position rect lights around the model (even lighting)
+        positionRectLights();
       },
       (xhr) => { if (xhr.lengthComputable) console.log(`Model ${(xhr.loaded/xhr.total*100).toFixed(1)}% loaded`); },
       (err) => { console.error('GLTF load error:', err); }
@@ -214,25 +224,21 @@
     // Remove previous GUI DOM nodes (avoid duplicates)
     document.querySelectorAll('.lil-gui, .dg').forEach(e => e.remove());
 
-    // --- GUI params (doubleSided default true) ---
+    // --- GUI params ---
     const params = {
-      exposure: 1.0,
+      exposure: 1.5,
       background: '#0b0b0b',
       shadows: true,
       doubleSided: true,
       showHelpers: false,
       axes: false,
-      // light orbit controls
-      lightOrbit: 30,         // degrees
-      lightRadius: 1.0,       // closer by default
-      lightElevation: 1.2,    // slightly lower elevation (closer)
-      // intensities (set equal defaults)
-      keyIntensity: 1.0,
-      fillIntensity: 1.0,
-      rimIntensity: 1.0,
-      // rotation auto options
-      autoRotate: false,
-      rotationSpeed: 40.0     // degrees per second
+      // light tuning
+      areaWidth: rectParams.width,
+      areaHeight: rectParams.height,
+      areaIntensity: rectParams.intensity,
+      areaRadius: rectParams.radius,
+      areaElevation: rectParams.elevation,
+      dirIntensity: dirLight.intensity
     };
 
     const gui = new GUI({ width: 220 });
@@ -243,7 +249,7 @@
     const defaultTitle = gui.domElement.querySelector('.title'); if (defaultTitle) defaultTitle.remove();
 
     // Exposure
-    gui.add(params, 'exposure', 0.1, 2.5, 0.01).name('exposure').onChange(v => {
+    gui.add(params, 'exposure', 0.5, 3.0, 0.01).name('exposure').onChange(v => {
       renderer.toneMappingExposure = v;
     });
 
@@ -270,109 +276,94 @@
 
     // Helpers and axes
     gui.add(params, 'showHelpers').name('show light helpers').onChange(v => {
-      keyHelper.visible = v;
-      fillHelper.visible = v;
-      rimHelper.visible = v;
+      // no area light helpers by default; show axes instead
+      rectHelpers.forEach(h => scene.remove(h));
+      rectHelpers.length = 0;
+      if (v) {
+        // add visible simple helpers for each rect light
+        rectLights.forEach(rl => {
+          const helper = new THREE.Mesh(new THREE.PlaneGeometry(rl.width, rl.height), new THREE.MeshBasicMaterial({ color: 0xffff00, opacity: 0.08, transparent: true }));
+          helper.position.copy(rl.position);
+          helper.lookAt(modelCenter);
+          rectHelpers.push(helper);
+          scene.add(helper);
+        });
+      } else {
+        rectHelpers.forEach(h => scene.remove(h));
+        rectHelpers.length = 0;
+      }
     });
+
     gui.add(params, 'axes').name('show axes').onChange(v => {
       axes.visible = v;
     });
 
-    // Light folder (bottom)
+    // Light folder
     const lightFolder = gui.addFolder('light');
-
-    // Rotation slider (manual)
-    lightFolder.add(params, 'lightOrbit', 0, 360, 1).name('rotation').onChange(v => {
-      // immediate update handled by per-frame call, but ensure position updates now
-      updateLightPositions(v, params.lightRadius, params.lightElevation);
+    lightFolder.add(params, 'areaWidth', 0.2, 4.0, 0.01).name('area width').onChange(v => {
+      rectLights.forEach(rl => rl.width = v);
     });
-
-    // Radius / elevation sliders (closer by default)
-    lightFolder.add(params, 'lightRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => {
-      updateLightPositions(params.lightOrbit, v, params.lightElevation);
+    lightFolder.add(params, 'areaHeight', 0.2, 3.0, 0.01).name('area height').onChange(v => {
+      rectLights.forEach(rl => rl.height = v);
     });
-    lightFolder.add(params, 'lightElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => {
-      updateLightPositions(params.lightOrbit, params.lightRadius, v);
+    lightFolder.add(params, 'areaIntensity', 0, 12, 0.01).name('area intensity').onChange(v => {
+      rectLights.forEach(rl => rl.intensity = v);
     });
-
-    // Intensities (equal by default)
-    lightFolder.add(params, 'keyIntensity', 0, 12, 0.01).name('key').onChange(v => keyLight.intensity = v);
-    lightFolder.add(params, 'fillIntensity', 0, 12, 0.01).name('fill').onChange(v => fillLight.intensity = v);
-    lightFolder.add(params, 'rimIntensity', 0, 12, 0.01).name('rim').onChange(v => rimLight.intensity = v);
-
-    // Auto-rotate toggle & speed slider (in GUI root)
-    gui.add(params, 'autoRotate').name('auto rotate');
-    gui.add(params, 'rotationSpeed', 1, 360, 1).name('speed (deg/s)');
-
-    // Keep the light folder closed by default
+    lightFolder.add(params, 'areaRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => {
+      positionRectLights();
+    });
+    lightFolder.add(params, 'areaElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => {
+      positionRectLights();
+    });
+    lightFolder.add(params, 'dirIntensity', 0, 4, 0.01).name('dir intensity').onChange(v => {
+      dirLight.intensity = v;
+    });
     lightFolder.close();
 
     // Ensure popups above gui
     gui.domElement.querySelectorAll('.picker, .popup').forEach(el => el.style.zIndex = '11000');
 
-    // --- Render / animate ---
-    let lastTime = performance.now();
+    // positionRectLights: place 4 area lights at fixed angles around model center
+    function positionRectLights() {
+      const radius = params.areaRadius;
+      const elevation = params.areaElevation;
+      const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]; // 0,90,180,270 degrees
+      for (let i = 0; i < rectLights.length; i++) {
+        const a = angles[i];
+        const rl = rectLights[i];
+        rl.width = params.areaWidth;
+        rl.height = params.areaHeight;
+        rl.intensity = params.areaIntensity;
 
-    function animate(now) {
-      requestAnimationFrame(animate);
-
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-
-      // If autoRotate is enabled, advance params.lightOrbit continuously (in degrees)
-      if (params.autoRotate) {
-        params.lightOrbit = (params.lightOrbit + params.rotationSpeed * dt) % 360;
+        rl.position.set(
+          modelCenter.x + Math.cos(a) * radius,
+          modelCenter.y + elevation,
+          modelCenter.z + Math.sin(a) * radius
+        );
+        rl.lookAt(modelCenter);
       }
 
-      // Keep lights synchronized with GUI parameters every frame so slider always moves lights.
-      updateLightPositions(params.lightOrbit, params.lightRadius, params.lightElevation);
-
-      // Apply intensities continuously (in case user changes GUI)
-      keyLight.intensity = params.keyIntensity;
-      fillLight.intensity = params.fillIntensity;
-      rimLight.intensity = params.rimIntensity;
-      dirLight.intensity = Math.max(0.0, (params.keyIntensity + params.fillIntensity + params.rimIntensity) / 3); // keep dir roughly matched
-
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    requestAnimationFrame(animate);
-
-    // --- Light positioning helper ---
-    function updateLightPositions(angleDeg = 0, radius = 1.0, elevation = 1.2) {
-      const a = (angleDeg * Math.PI) / 180;
-      // keyLight in front-right
-      keyLight.position.set(
-        modelCenter.x + Math.cos(a) * radius,
-        modelCenter.y + elevation,
-        modelCenter.z + Math.sin(a) * radius
-      );
-      keyLight.lookAt(modelCenter);
-
-      // fillLight opposite side (180 deg offset)
-      const aFill = a + Math.PI;
-      fillLight.position.set(
-        modelCenter.x + Math.cos(aFill) * (radius * 0.95),
-        modelCenter.y + elevation * 0.85,
-        modelCenter.z + Math.sin(aFill) * (radius * 0.95)
-      );
-      fillLight.lookAt(modelCenter);
-
-      // rimLight slightly to the back and off-center (+90 deg)
-      const aRim = a + Math.PI * 0.5;
-      rimLight.position.set(
-        modelCenter.x + Math.cos(aRim) * (radius * 1.1),
-        modelCenter.y + elevation,
-        modelCenter.z + Math.sin(aRim) * (radius * 1.1)
-      );
-      rimLight.lookAt(modelCenter);
-
-      // directional target to center (ensures dir light aims properly)
+      // also update directional target to center
       if (dirLight.target) {
         dirLight.target.position.set(modelCenter.x, modelCenter.y, modelCenter.z);
         scene.add(dirLight.target);
       }
     }
+
+    // call once per-frame to ensure lights follow GUI (cheap)
+    function animate(now) {
+      requestAnimationFrame(animate);
+      // keep rect lights positioned in case radius/elevation changed
+      positionRectLights();
+
+      // ensure intensities used
+      rectLights.forEach(rl => rl.intensity = params.areaIntensity);
+      dirLight.intensity = params.dirIntensity;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(animate);
 
     // Resize handling
     window.addEventListener('resize', () => {
