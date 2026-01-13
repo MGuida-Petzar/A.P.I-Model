@@ -3,11 +3,66 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I-Model — Studio Lighting + GUI (no floor)</title>
+  <title>A.P.I-Model — Studio Lighting + GUI (Material-You style)</title>
   <style>
     html,body { height:100%; margin:0; background:#111; }
     canvas { display:block; width:100%; height:100vh; }
-    .dg { z-index: 10000 !important; }
+
+    /* Material-You-like styling for lil-gui */
+    .lil-gui, .dg {
+      position: fixed !important;
+      right: 20px;
+      bottom: 20px;
+      width: 300px !important;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 12px 30px rgba(2,6,23,0.6), inset 0 1px rgba(255,255,255,0.02);
+      backdrop-filter: blur(8px) saturate(120%);
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      color: #ffffff;
+      font-family: "Roboto", "Google Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      z-index: 10000;
+    }
+
+    /* Header accent pill like Material You */
+    .lil-gui .title, .dg .title {
+      display: block;
+      margin: 8px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #ffd28a, #ff9b9b);
+      color: #1b1b1b;
+      font-weight: 600;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+      text-align: left;
+    }
+
+    /* Make group/rows slightly transparent */
+    .lil-gui .controller, .dg .controller {
+      background: rgba(255,255,255,0.02);
+      margin: 6px 8px;
+      border-radius: 8px;
+      padding: 6px;
+    }
+
+    /* Tweak label color and size */
+    .lil-gui .label, .dg .label {
+      color: #eaeaea;
+      font-size: 13px;
+    }
+
+    /* Color inputs: slightly rounded */
+    .lil-gui input[type="color"], .dg input[type="color"] {
+      border-radius: 8px;
+      padding: 2px;
+    }
+
+    /* Compact folders */
+    .lil-gui .folder, .dg .folder {
+      border-radius: 10px;
+      margin: 6px 8px;
+      padding: 6px;
+    }
   </style>
 
   <script type="importmap">
@@ -82,8 +137,6 @@
     dirLight.shadow.camera.far = 50;
     scene.add(dirLight);
 
-    // Note: Floor/ground plane removed per request (no ground to receive shadows)
-
     // Helpers
     const keyHelper = new RectAreaLightHelper(keyLight);
     const fillHelper = new RectAreaLightHelper(fillLight);
@@ -101,16 +154,49 @@
     const loader = new GLTFLoader();
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
+    // GUI params: doubleSided default true
+    const params = {
+      exposure: 1.0,
+      background: '#0b0b0b',
+      ambient: ambient.intensity,
+      hemi: hemi.intensity,
+      keyColor: '#ffffff',
+      keyIntensity: keyLight.intensity,
+      fillColor: '#ffffff',
+      fillIntensity: fillLight.intensity,
+      rimColor: '#ffffff',
+      rimIntensity: rimLight.intensity,
+      dirIntensity: dirLight.intensity,
+      shadows: true,
+      doubleSided: true, // <-- enabled by default
+      showHelpers: false,
+      axes: false
+    };
+
+    let loadedModel = null;
+
     loader.load(
       modelUrl,
       (gltf) => {
         const model = gltf.scene;
+        loadedModel = model;
+
         model.traverse((n) => {
           if (n.isMesh) {
             n.castShadow = true;
             n.receiveShadow = true;
           }
         });
+
+        // Apply default double-sided if true
+        if (params.doubleSided) {
+          model.traverse((n) => {
+            if (n.isMesh && n.material) {
+              n.material.side = THREE.DoubleSide;
+              n.material.needsUpdate = true;
+            }
+          });
+        }
 
         scene.add(model);
 
@@ -149,24 +235,16 @@
     );
 
     // GUI
-    const gui = new GUI({ title: 'Studio lights', width: 320 });
-    const params = {
-      exposure: 1.0,
-      background: '#0b0b0b',
-      ambient: ambient.intensity,
-      hemi: hemi.intensity,
-      keyColor: '#ffffff',
-      keyIntensity: keyLight.intensity,
-      fillColor: '#ffffff',
-      fillIntensity: fillLight.intensity,
-      rimColor: '#ffffff',
-      rimIntensity: rimLight.intensity,
-      dirIntensity: dirLight.intensity,
-      shadows: true,
-      doubleSided: false,
-      showHelpers: false,
-      axes: false
-    };
+    const gui = new GUI({ title: 'Studio lights', width: 300 });
+
+    // Make sure the GUI is fixed bottom-right even if library doesn't set it by default
+    gui.domElement.style.position = 'fixed';
+    gui.domElement.style.right = '20px';
+    gui.domElement.style.bottom = '20px';
+    gui.domElement.style.borderRadius = '14px';
+    gui.domElement.style.overflow = 'hidden';
+    gui.domElement.style.backdropFilter = 'blur(8px) saturate(120%)';
+    gui.domElement.style.zIndex = '10000';
 
     gui.add(params, 'exposure', 0.1, 2.5, 0.01).name('Exposure').onChange(v => {
       renderer.toneMappingExposure = v;
@@ -198,8 +276,10 @@
       renderer.shadowMap.enabled = v;
     });
 
+    // Double-sided control — default is true, and this handler toggles materials live
     gui.add(params, 'doubleSided').name('Double Sided').onChange(v => {
-      scene.traverse((n) => {
+      if (!loadedModel) return;
+      loadedModel.traverse((n) => {
         if (n.isMesh && n.material) {
           n.material.side = v ? THREE.DoubleSide : THREE.FrontSide;
           n.material.needsUpdate = true;
@@ -215,7 +295,8 @@
 
     gui.add(params, 'axes').name('Show Axes').onChange(v => axes.visible = v);
 
-    gui.domElement.style.zIndex = '10000';
+    // Make the GUI header resemble a Material-You accent (also handled via CSS above)
+    // No further JS needed; the CSS in <head> will style the gui elements.
 
     // Animate
     function animate() {
