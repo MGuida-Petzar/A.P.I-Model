@@ -132,13 +132,15 @@
     scene.add(hemi);
 
     RectAreaLightUniformsLib.init();
-    const keyLight = new THREE.RectAreaLight(0xffffff, 6.0, 2.6, 1.2);
-    const fillLight = new THREE.RectAreaLight(0xffffff, 1.2, 2.2, 1.0);
-    const rimLight = new THREE.RectAreaLight(0xffffff, 2.0, 1.6, 1.0);
+    const keyLight = new THREE.RectAreaLight(0xffffff, 1.0, 2.6, 1.2);
+    const fillLight = new THREE.RectAreaLight(0xffffff, 1.0, 2.2, 1.0);
+    const rimLight = new THREE.RectAreaLight(0xffffff, 1.0, 1.6, 1.0);
+    // set castShadow for main key/dir if desired
     keyLight.castShadow = true;
     scene.add(keyLight, fillLight, rimLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.25);
+    // Make directional light similar brightness so it matches
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
     dirLight.position.set(5, 10, 7.5);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.set(2048, 2048);
@@ -158,7 +160,7 @@
 
     // --- Loader + model ---
     const loader = new GLTFLoader();
-    // Updated model URL:
+    // model URL as you requested:
     const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API.glb';
 
     let loadedModel = null;
@@ -202,7 +204,7 @@
         controls.target.copy(modelCenter);
         controls.update();
 
-        // set initial light positions
+        // set initial light positions (after center known)
         updateLightPositions(params.lightOrbit, params.lightRadius, params.lightElevation);
       },
       (xhr) => { if (xhr.lengthComputable) console.log(`Model ${(xhr.loaded/xhr.total*100).toFixed(1)}% loaded`); },
@@ -221,22 +223,17 @@
       showHelpers: false,
       axes: false,
       // light orbit controls
-      lightOrbit: 30,         // degrees (manual slider)
-      lightRadius: 2.2,
-      lightElevation: 1.6,
-      // intensities
-      keyIntensity: 6.0,
-      fillIntensity: 1.2,
-      rimIntensity: 2.0
+      lightOrbit: 30,         // degrees
+      lightRadius: 1.0,       // closer by default
+      lightElevation: 1.2,    // slightly lower elevation (closer)
+      // intensities (set equal defaults)
+      keyIntensity: 1.0,
+      fillIntensity: 1.0,
+      rimIntensity: 1.0,
+      // rotation auto options
+      autoRotate: false,
+      rotationSpeed: 40.0     // degrees per second
     };
-
-    // Rotation animation state
-    let rotating = false;
-    let rotateStart = 0;
-    let rotateDuration = 0;
-    let rotateFrom = 0;
-    let rotateTo = 0;
-    let rotateRAF = null;
 
     const gui = new GUI({ width: 220 });
     gui.domElement.style.position = 'fixed';
@@ -284,37 +281,28 @@
     // Light folder (bottom)
     const lightFolder = gui.addFolder('light');
 
-    // Orbit slider (manual)
-    const orbitController = lightFolder.add(params, 'lightOrbit', 0, 360, 1).name('light orbit').onChange(v => {
+    // Rotation slider (manual)
+    lightFolder.add(params, 'lightOrbit', 0, 360, 1).name('rotation').onChange(v => {
+      // immediate update handled by per-frame call, but ensure position updates now
       updateLightPositions(v, params.lightRadius, params.lightElevation);
     });
 
-    // Radius / elevation sliders
-    lightFolder.add(params, 'lightRadius', 0.5, 6.0, 0.01).name('radius').onChange(v => {
+    // Radius / elevation sliders (closer by default)
+    lightFolder.add(params, 'lightRadius', 0.2, 4.0, 0.01).name('radius').onChange(v => {
       updateLightPositions(params.lightOrbit, v, params.lightElevation);
     });
     lightFolder.add(params, 'lightElevation', -2.0, 6.0, 0.01).name('elevation').onChange(v => {
       updateLightPositions(params.lightOrbit, params.lightRadius, v);
     });
 
-    // Intensities
+    // Intensities (equal by default)
     lightFolder.add(params, 'keyIntensity', 0, 12, 0.01).name('key').onChange(v => keyLight.intensity = v);
-    lightFolder.add(params, 'fillIntensity', 0, 6, 0.01).name('fill').onChange(v => fillLight.intensity = v);
-    lightFolder.add(params, 'rimIntensity', 0, 8, 0.01).name('rim').onChange(v => rimLight.intensity = v);
+    lightFolder.add(params, 'fillIntensity', 0, 12, 0.01).name('fill').onChange(v => fillLight.intensity = v);
+    lightFolder.add(params, 'rimIntensity', 0, 12, 0.01).name('rim').onChange(v => rimLight.intensity = v);
 
-    // Add Rotate 360 button + manual progress slider (like exposure)
-    const controlActions = {
-      rotate360: () => startRotation(5000), // default 5s full rotation
-      stopRotation: () => stopRotation()
-    };
-
-    // rotation progress slider - mirrors params.lightOrbit
-    gui.add(params, 'lightOrbit', 0, 360, 1).name('rotation').onChange(v => {
-      updateLightPositions(v, params.lightRadius, params.lightElevation);
-    });
-
-    gui.add(controlActions, 'rotate360').name('rotate 360');
-    gui.add(controlActions, 'stopRotation').name('stop');
+    // Auto-rotate toggle & speed slider (in GUI root)
+    gui.add(params, 'autoRotate').name('auto rotate');
+    gui.add(params, 'rotationSpeed', 1, 360, 1).name('speed (deg/s)');
 
     // Keep the light folder closed by default
     lightFolder.close();
@@ -322,46 +310,38 @@
     // Ensure popups above gui
     gui.domElement.querySelectorAll('.picker, .popup').forEach(el => el.style.zIndex = '11000');
 
-    // --- Rotation animation functions ---
-    function startRotation(durationMs = 5000) {
-      if (rotating) {
-        stopRotation();
-      }
-      rotating = true;
-      rotateDuration = durationMs;
-      rotateStart = performance.now();
-      rotateFrom = params.lightOrbit % 360;
-      rotateTo = rotateFrom + 360;
-      rotateRAF = requestAnimationFrame(rotateStep);
-    }
+    // --- Render / animate ---
+    let lastTime = performance.now();
 
-    function rotateStep(now) {
-      const elapsed = now - rotateStart;
-      const t = Math.min(1, elapsed / rotateDuration);
-      const eased = t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
-      const angle = rotateFrom + (rotateTo - rotateFrom) * eased;
-      params.lightOrbit = angle % 360;
-      // update GUI control display and lights
-      orbitController.setValue(params.lightOrbit);
+    function animate(now) {
+      requestAnimationFrame(animate);
+
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      // If autoRotate is enabled, advance params.lightOrbit continuously (in degrees)
+      if (params.autoRotate) {
+        params.lightOrbit = (params.lightOrbit + params.rotationSpeed * dt) % 360;
+      }
+
+      // Keep lights synchronized with GUI parameters every frame so slider always moves lights.
       updateLightPositions(params.lightOrbit, params.lightRadius, params.lightElevation);
 
-      if (t < 1 && rotating) {
-        rotateRAF = requestAnimationFrame(rotateStep);
-      } else {
-        rotating = false;
-        rotateRAF = null;
-      }
-    }
+      // Apply intensities continuously (in case user changes GUI)
+      keyLight.intensity = params.keyIntensity;
+      fillLight.intensity = params.fillIntensity;
+      rimLight.intensity = params.rimIntensity;
+      dirLight.intensity = Math.max(0.0, (params.keyIntensity + params.fillIntensity + params.rimIntensity) / 3); // keep dir roughly matched
 
-    function stopRotation() {
-      if (rotateRAF) cancelAnimationFrame(rotateRAF);
-      rotating = false;
-      rotateRAF = null;
+      controls.update();
+      renderer.render(scene, camera);
     }
+    requestAnimationFrame(animate);
 
     // --- Light positioning helper ---
-    function updateLightPositions(angleDeg = 0, radius = 2.2, elevation = 1.6) {
+    function updateLightPositions(angleDeg = 0, radius = 1.0, elevation = 1.2) {
       const a = (angleDeg * Math.PI) / 180;
+      // keyLight in front-right
       keyLight.position.set(
         modelCenter.x + Math.cos(a) * radius,
         modelCenter.y + elevation,
@@ -369,6 +349,7 @@
       );
       keyLight.lookAt(modelCenter);
 
+      // fillLight opposite side (180 deg offset)
       const aFill = a + Math.PI;
       fillLight.position.set(
         modelCenter.x + Math.cos(aFill) * (radius * 0.95),
@@ -377,6 +358,7 @@
       );
       fillLight.lookAt(modelCenter);
 
+      // rimLight slightly to the back and off-center (+90 deg)
       const aRim = a + Math.PI * 0.5;
       rimLight.position.set(
         modelCenter.x + Math.cos(aRim) * (radius * 1.1),
@@ -385,24 +367,14 @@
       );
       rimLight.lookAt(modelCenter);
 
+      // directional target to center (ensures dir light aims properly)
       if (dirLight.target) {
         dirLight.target.position.set(modelCenter.x, modelCenter.y, modelCenter.z);
         scene.add(dirLight.target);
       }
     }
 
-    // --- Render loop ---
-    function animate() {
-      requestAnimationFrame(animate);
-
-      // Keep lights synchronized with GUI parameters every frame so slider always moves lights.
-      updateLightPositions(params.lightOrbit, params.lightRadius, params.lightElevation);
-
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
-
+    // Resize handling
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
