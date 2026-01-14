@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>A.P.I - Model</title>
+  <title>A.P.I - Studio</title>
   <style>
     html,body { height:100%; margin:0; background:#0b0b0b; overflow: hidden; }
     canvas { display:block; width:100%; height:100vh; }
@@ -77,29 +77,26 @@
     controls.enableDamping = true;
 
     // --- LIGHTING SETUP ---
-    // 1. Fill Lighting (Studio) - Default is high to prevent pure dark
     const ambientFill = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambientFill);
 
-    // 2. The Moveable Directional Light (The "Sun")
     const sunLight = new THREE.DirectionalLight(0xffffff, 3.5);
-    sunLight.visible = false; 
     scene.add(sunLight);
 
-    // --- DEFAULTS ---
+    // --- UPDATED DEFAULTS ---
     const params = {
       metalness: 1.0, 
       roughness: 0.5,
-      enableSun: false,
-      lightAzimuth: 45,   
-      lightElevation: 45, 
+      enableSun: true,       // NOW ENABLED BY DEFAULT
+      lightAzimuth: 0,       // HORIZONTAL AT 0
+      lightElevation: 40.5,  // VERTICAL AT 40.5
       lightDistance: 5,
       reset: function() {
           params.metalness = 1.0;
           params.roughness = 0.5;
-          params.enableSun = false;
-          params.lightAzimuth = 45;
-          params.lightElevation = 45;
+          params.enableSun = true;
+          params.lightAzimuth = 0;
+          params.lightElevation = 40.5;
           updateLightLogic();
           updateMaterials();
           gui.controllersRecursive().forEach(c => c.updateDisplay());
@@ -108,11 +105,9 @@
 
     function updateLightLogic() {
         if (params.enableSun) {
-            // Directional Light Mode: Kill the studio fill for high contrast
             sunLight.visible = true;
             ambientFill.intensity = 0.1; 
         } else {
-            // Studio Mode: Return to full brightness
             sunLight.visible = false;
             ambientFill.intensity = 2.0;
         }
@@ -121,6 +116,8 @@
         const theta = THREE.MathUtils.degToRad(params.lightAzimuth);
         sunLight.position.setFromSphericalCoords(params.lightDistance, phi, theta);
     }
+    
+    // Initial call to apply defaults
     updateLightLogic();
 
     // --- Loader ---
@@ -154,7 +151,7 @@
     }
 
     // --- GUI ---
-    const gui = new GUI({ title: 'A.P.I' });
+    const gui = new GUI({ title: 'A.P.I The Robot' });
 
     const lightFolder = gui.addFolder('Dynamic Lighting');
     lightFolder.add(params, 'enableSun').name('Directional Light Mode').onChange(updateLightLogic);
