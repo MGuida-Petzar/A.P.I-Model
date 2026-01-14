@@ -155,6 +155,21 @@
         });
     }
 
+    // --- Omni Lighting ---
+    const ambient = new THREE.AmbientLight(0xffffff, 2.0);
+    scene.add(ambient);
+
+    const directions = [
+        new THREE.Vector3(0, 10, 0), new THREE.Vector3(0, -10, 0),
+        new THREE.Vector3(10, 0, 0), new THREE.Vector3(-10, 0, 0),
+        new THREE.Vector3(0, 0, 10), new THREE.Vector3(0, 0, -10)
+    ];
+    directions.forEach(dir => {
+        const light = new THREE.DirectionalLight(0xffffff, 0.5);
+        light.position.copy(dir);
+        scene.add(light);
+    });
+    
     // --- GUI ---
     const gui = new GUI({ title: 'A.P.I The Robot' });
 
@@ -184,6 +199,7 @@
   </script>
 </body>
 </html>
+
 
 
 
