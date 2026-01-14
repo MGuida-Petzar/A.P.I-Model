@@ -77,44 +77,51 @@
     controls.enableDamping = true;
 
     // --- LIGHTING SETUP ---
-    // 1. Fill Lighting
-    const ambient = new THREE.AmbientLight(0xffffff, 1.0);
-    scene.add(ambient);
+    // 1. Fill Lighting (Studio) - Default is high to prevent pure dark
+    const ambientFill = new THREE.AmbientLight(0xffffff, 2.0);
+    scene.add(ambientFill);
 
     // 2. The Moveable Directional Light (The "Sun")
-    const sunLight = new THREE.DirectionalLight(0xffffff, 3.0);
-    sunLight.visible = false; // DISABLED BY DEFAULT
+    const sunLight = new THREE.DirectionalLight(0xffffff, 3.5);
+    sunLight.visible = false; 
     scene.add(sunLight);
 
     // --- DEFAULTS ---
     const params = {
-      exposure: 0.6,
       metalness: 1.0, 
-      roughness: 0.5, // NEW DEFAULT
-      enableSun: false, // TOGGLE DEFAULT
+      roughness: 0.5,
+      enableSun: false,
       lightAzimuth: 45,   
       lightElevation: 45, 
       lightDistance: 5,
       reset: function() {
-          params.exposure = 0.6;
           params.metalness = 1.0;
           params.roughness = 0.5;
           params.enableSun = false;
           params.lightAzimuth = 45;
           params.lightElevation = 45;
-          updateLight();
+          updateLightLogic();
           updateMaterials();
           gui.controllersRecursive().forEach(c => c.updateDisplay());
       }
     };
 
-    function updateLight() {
-        sunLight.visible = params.enableSun;
+    function updateLightLogic() {
+        if (params.enableSun) {
+            // Directional Light Mode: Kill the studio fill for high contrast
+            sunLight.visible = true;
+            ambientFill.intensity = 0.1; 
+        } else {
+            // Studio Mode: Return to full brightness
+            sunLight.visible = false;
+            ambientFill.intensity = 2.0;
+        }
+
         const phi = THREE.MathUtils.degToRad(90 - params.lightElevation);
         const theta = THREE.MathUtils.degToRad(params.lightAzimuth);
         sunLight.position.setFromSphericalCoords(params.lightDistance, phi, theta);
     }
-    updateLight();
+    updateLightLogic();
 
     // --- Loader ---
     let modelMaterials = [];
@@ -147,13 +154,12 @@
     }
 
     // --- GUI ---
-    const gui = new GUI({ title: 'A.P.I Model' });
+    const gui = new GUI({ title: 'A.P.I' });
 
-    const lightFolder = gui.addFolder('Lighting Settings');
-    lightFolder.add(params, 'enableSun').name('Enable Directional Light').onChange(updateLight);
-    lightFolder.add(params, 'lightAzimuth', 0, 360).name('Horizontal Move').onChange(updateLight);
-    lightFolder.add(params, 'lightElevation', -90, 90).name('Vertical Move').onChange(updateLight);
-    lightFolder.add(params, 'exposure', 0, 2).name('Studio Brightness').onChange(v => renderer.toneMappingExposure = v);
+    const lightFolder = gui.addFolder('Dynamic Lighting');
+    lightFolder.add(params, 'enableSun').name('Directional Light Mode').onChange(updateLightLogic);
+    lightFolder.add(params, 'lightAzimuth', 0, 360).name('Horizontal Move').onChange(updateLightLogic);
+    lightFolder.add(params, 'lightElevation', -90, 90).name('Vertical Move').onChange(updateLightLogic);
 
     const matFolder = gui.addFolder('Material Finish');
     matFolder.add(params, 'metalness', 0, 1).name('Metalness').onChange(updateMaterials);
