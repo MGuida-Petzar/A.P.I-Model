@@ -135,7 +135,7 @@
                 modelMaterials.push(n.material);
             }
         });
-        cene.add(model);
+        scene.add(model);
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -178,4 +178,5 @@
   </script>
 </body>
 </html>
+
 
