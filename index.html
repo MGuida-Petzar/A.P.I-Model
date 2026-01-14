@@ -135,11 +135,11 @@
                 modelMaterials.push(n.material);
             }
         });
-        scene.add(model);
-        
-        // Removed auto-targeting/centering sub(center) logic
-        // This keeps the model at its original coordinates
-        controls.update();
+        cene.add(model);
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        model.position.sub(center);
     });
 
     function updateMaterials() {
@@ -178,3 +178,4 @@
   </script>
 </body>
 </html>
+
