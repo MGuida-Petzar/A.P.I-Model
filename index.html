@@ -4,67 +4,84 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>A.P.I - Studio</title>
-  <style>
-   /* Fixes the disappearing slider bar and spacing */
-    .lil-gui .controller {
-      margin-bottom: 8px !important;
-      border-radius: 12px !important; 
-      background: rgba(255, 255, 255, 0.05) !important;
-      padding: 4px 8px !important; /* Slightly reduced padding to save space */
-      display: flex !important;
-      align-items: center !important;
-    }
+<style>
+  /* Prevents any scrollbars from appearing */
+  html, body { 
+    height: 100%; 
+    margin: 0; 
+    padding: 0;
+    background: #0b0b0b; 
+    overflow: hidden; /* This is the key fix for scrollbars */
+    width: 100%;
+  }
 
-    /* Ensures the slider track (purple bar) is visible and correctly sized */
-    .lil-gui .widget {
-      flex-grow: 1 !important;
-      display: flex !important;
-      align-items: center !important;
-      min-width: 80px !important; /* Forces the slider to have a minimum width */
-    }
+  /* Ensures the 3D area fills the screen exactly */
+  canvas { 
+    display: block; 
+    width: 100vw; 
+    height: 100vh; 
+    position: fixed; 
+    top: 0; 
+    left: 0;
+  }
 
-    .lil-gui .slider {
-      background: rgba(255, 255, 255, 0.1) !important; /* The 'empty' part of the bar */
-      height: 6px !important;
-      border-radius: 10px !important;
-    }
+  /* Material You GUI Styling */
+  .lil-gui { 
+    --background-color: rgba(28, 27, 31, 0.92);
+    --text-color: #e6e1e5;
+    --title-background-color: transparent;
+    --widget-color: #4f378b; 
+    --hover-color: #6750a4;
+    --focus-color: #d0bcff;
+    --number-color: #d0bcff;
+    --string-color: #d0bcff;
+    border-radius: 32px !important; 
+    padding: 20px !important;
+    border: none !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
+    backdrop-filter: blur(14px);
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  }
 
-    .lil-gui .slider-fg {
-      background: #d0bcff !important; /* The 'filled' purple part of the bar */
-      border-radius: 10px !important;
-    }
-    
-    /* --- MATERIAL YOU GUI STYLING --- */
-    .lil-gui { 
-      --background-color: rgba(28, 27, 31, 0.92);
-      --text-color: #e6e1e5;
-      --title-background-color: transparent;
-      --widget-color: #4f378b; 
-      --hover-color: #6750a4;
-      --focus-color: #d0bcff;
-      --number-color: #d0bcff;
-      --string-color: #d0bcff;
-      border-radius: 32px !important; 
-      padding: 20px !important;
-      border: none !important;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
-      backdrop-filter: blur(14px);
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-    }
-    .lil-gui .controller {
-      margin-bottom: 8px !important;
-      border-radius: 20px !important; 
-      background: rgba(255, 255, 255, 0.05) !important;
-      padding: 6px 14px !important;
-    }
-    .lil-gui .controller.button {
-      background: #d0bcff !important; 
-      border-radius: 40px !important;
-      margin-top: 10px !important;
-      justify-content: center !important;
-    }
-    .lil-gui .controller.button .name { color: #381e72 !important; font-weight: 700 !important; }
-  </style>
+  .lil-gui .controller {
+    margin-bottom: 8px !important;
+    border-radius: 12px !important; 
+    background: rgba(255, 255, 255, 0.05) !important;
+    padding: 4px 8px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .lil-gui .widget {
+    flex-grow: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    min-width: 120px !important;
+  }
+
+  .lil-gui .slider {
+    background: rgba(255, 255, 255, 0.1) !important;
+    height: 6px !important;
+    border-radius: 10px !important;
+  }
+
+  .lil-gui .slider-fg {
+    background: #d0bcff !important;
+    border-radius: 10px !important;
+  }
+
+  .lil-gui .controller.button {
+    background: #d0bcff !important; 
+    border-radius: 40px !important;
+    margin-top: 10px !important;
+    justify-content: center !important;
+  }
+
+  .lil-gui .controller.button .name { 
+    color: #381e72 !important; 
+    font-weight: 700 !important; 
+  }
+</style>
 
   <script type="importmap">
   {
@@ -225,6 +242,7 @@
   </script>
 </body>
 </html>
+
 
 
 
