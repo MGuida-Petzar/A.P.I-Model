@@ -52,6 +52,7 @@
   <canvas id="canvas"></canvas>
 
   <script type="module">
+    import * as THREE from 'this';
     import * as THREE from 'three';
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/loaders/GLTFLoader.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
@@ -71,8 +72,7 @@
     scene.background = new THREE.Color(0x0b0b0b);
 
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 5);
-
+    
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
@@ -83,13 +83,13 @@
     const sunLight = new THREE.DirectionalLight(0xffffff, 3.5);
     scene.add(sunLight);
 
-    // --- UPDATED DEFAULTS ---
+    // --- DEFAULTS ---
     const params = {
       metalness: 1.0, 
       roughness: 0.5,
-      enableSun: true,       // NOW ENABLED BY DEFAULT
-      lightAzimuth: 0,       // HORIZONTAL AT 0
-      lightElevation: 40.5,  // VERTICAL AT 40.5
+      enableSun: true,
+      lightAzimuth: 0,
+      lightElevation: 40.5,
       lightDistance: 5,
       reset: function() {
           params.metalness = 1.0;
@@ -117,7 +117,6 @@
         sunLight.position.setFromSphericalCoords(params.lightDistance, phi, theta);
     }
     
-    // Initial call to apply defaults
     updateLightLogic();
 
     // --- Loader ---
@@ -137,9 +136,22 @@
         });
         scene.add(model);
         
+        // --- IMPROVED AUTO-ZOOM LOGIC ---
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
-        model.position.sub(center);
+        const size = box.getSize(new THREE.Vector3());
+        model.position.sub(center); // Center the model
+        
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        // Calculate distance so the model occupies roughly 60% of the screen
+        let cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
+        
+        // Apply the distance
+        camera.position.set(0, maxDim * 0.2, cameraDistance * 1.2); 
+        camera.lookAt(0, 0, 0);
+        
+        controls.target.set(0, 0, 0);
         controls.update();
     });
 
@@ -151,7 +163,7 @@
     }
 
     // --- GUI ---
-    const gui = new GUI({ title: 'A.P.I The Robot' });
+    const gui = new GUI({ title: 'A.P.I THE ROBOT' });
 
     const lightFolder = gui.addFolder('Dynamic Lighting');
     lightFolder.add(params, 'enableSun').name('Directional Light Mode').onChange(updateLightLogic);
