@@ -75,7 +75,7 @@
 </head>
 <body>
   <div id="loading-overlay">
-    <div class="loader-text">Configuring A.P.I ... <span id="percent">0%</span></div>
+    <div class="loader-text">Loading A.P.I Models ... <span id="percent">0%</span></div>
     <div class="progress-container"><div id="progress-bar"></div></div>
   </div>
 
@@ -221,8 +221,8 @@
     }
 
     const gui = new GUI({ title: 'A.P.I STUDIO' });
-    const configFolder = gui.addFolder('🔧 A.P.I CONFIGURATION');
-    configFolder.add(params, 'modelVariant', ['Full Body', 'Part Off']).name('Model Variant').onChange(updateModelSelection);
+    const configFolder = gui.addFolder('A.P.I - Toggles');
+    configFolder.add(params, 'modelVariant', ['Full Body', 'Leg Off']).name('Model Variant').onChange(updateModelSelection);
     configFolder.open();
 
     const lightFolder = gui.addFolder('Dynamic Lighting');
@@ -248,3 +248,4 @@
   </script>
 </body>
 </html>
+
