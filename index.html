@@ -4,90 +4,37 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>A.P.I - Studio</title>
-  <style>
-    /* Prevents any scrollbars from appearing */
-    html, body { 
-      height: 100%; 
-      margin: 0; 
-      padding: 0;
-      background: #0b0b0b; 
-      overflow: hidden; 
-      width: 100%;
-    }
+<style>
+  html, body { height: 100%; margin: 0; padding: 0; background: #0b0b0b; overflow: hidden; width: 100%; }
+  canvas { display: block; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
 
-    /* Ensures the 3D area fills the screen exactly */
-    canvas { 
-      display: block; 
-      width: 100vw; 
-      height: 100vh; 
-      position: fixed; 
-      top: 0; 
-      left: 0;
-    }
-
-    /* Material You GUI Styling */
-    .lil-gui { 
-      --background-color: rgba(28, 27, 31, 0.92);
-      --text-color: #e6e1e5;
-      --title-background-color: transparent;
-      --widget-color: #4f378b; 
-      --hover-color: #6750a4;
-      --focus-color: #d0bcff;
-      --number-color: #d0bcff;
-      --string-color: #d0bcff;
-      border-radius: 32px !important; 
-      padding: 20px !important;
-      border: none !important;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
-      backdrop-filter: blur(14px);
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-    }
-
-    .lil-gui .controller {
-      margin-bottom: 8px !important;
-      border-radius: 12px !important; 
-      background: rgba(255, 255, 255, 0.05) !important;
-      padding: 4px 8px !important;
-      display: flex !important;
-      align-items: center !important;
-    }
-
-    .lil-gui .widget {
-      flex-grow: 1 !important;
-      display: flex !important;
-      align-items: center !important;
-      min-width: 100px !important;
-    }
-
-    .lil-gui .slider {
-      background: rgba(255, 255, 255, 0.1) !important;
-      height: 6px !important;
-      border-radius: 10px !important;
-    }
-
-    .lil-gui .slider-fg {
-      background: #d0bcff !important;
-      border-radius: 10px !important;
-    }
-
-    .lil-gui .controller.button {
-      background: #d0bcff !important; 
-      border-radius: 40px !important;
-      margin-top: 10px !important;
-      justify-content: center !important;
-    }
-
-    .lil-gui .controller.button .name { 
-      color: #381e72 !important; 
-      font-weight: 700 !important; 
-    }
-  </style>
+  .lil-gui { 
+    --background-color: rgba(28, 27, 31, 0.92);
+    --text-color: #e6e1e5;
+    --title-background-color: transparent;
+    --widget-color: #4f378b; 
+    --hover-color: #6750a4;
+    --focus-color: #d0bcff;
+    --number-color: #d0bcff;
+    --string-color: #d0bcff;
+    border-radius: 32px !important; 
+    padding: 20px !important;
+    border: none !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
+    backdrop-filter: blur(14px);
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  }
+  .lil-gui .controller { margin-bottom: 8px !important; border-radius: 12px !important; background: rgba(255, 255, 255, 0.05) !important; padding: 4px 8px !important; display: flex !important; align-items: center !important; }
+  .lil-gui .widget { flex-grow: 1 !important; display: flex !important; align-items: center !important; min-width: 100px !important; }
+  .lil-gui .slider { background: rgba(255, 255, 255, 0.1) !important; height: 6px !important; border-radius: 10px !important; }
+  .lil-gui .slider-fg { background: #d0bcff !important; border-radius: 10px !important; }
+  .lil-gui .controller.button { background: #d0bcff !important; border-radius: 40px !important; margin-top: 10px !important; justify-content: center !important; }
+  .lil-gui .controller.button .name { color: #381e72 !important; font-weight: 700 !important; }
+</style>
 
   <script type="importmap">
   {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.144.0/build/three.module.js"
-    }
+    "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.144.0/build/three.module.js" }
   }
   </script>
 </head>
@@ -100,12 +47,10 @@
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
-    // --- MODEL URLs ---
+    // --- URLs ---
     const modelUrlA = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API21.glb';
-    // !IMPORTANT: PASTE YOUR SECOND URL HERE (Part Off Version)
-    const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; 
+    const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; // Update this link!
 
-    // --- Renderer ---
     const canvas = document.getElementById('canvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -118,26 +63,24 @@
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0b0b);
 
-    // Initial camera position (Pulled back to avoid deep zoom)
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 2, 10); 
     
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- LIGHTING SETUP (Base) ---
+    // --- BASE LIGHTS ---
     const ambientFill = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambientFill);
 
     const sunLight = new THREE.DirectionalLight(0xffffff, 3.5);
     scene.add(sunLight);
 
-    // --- STATE VARIABLES ---
+    // --- STATE ---
     let currentModel = null;
     let modelMaterials = [];
     const loader = new GLTFLoader();
 
-    // --- DEFAULTS ---
     const params = {
       metalness: 1.0, 
       roughness: 0.5,
@@ -145,10 +88,7 @@
       lightAzimuth: 0,
       lightElevation: 40.5,
       lightDistance: 10,
-      
-      // NEW: Toggle for Swapping
-      showMainPart: true,
-
+      showMainPart: true, // The toggle variable
       reset: function() {
           params.metalness = 1.0;
           params.roughness = 0.5;
@@ -156,10 +96,8 @@
           params.lightAzimuth = 0;
           params.lightElevation = 40.5;
           params.showMainPart = true;
-
           updateLightLogic();
-          updateModelSelection(); // Reset model state
-          updateMaterials();
+          updateModelSelection();
           gui.controllersRecursive().forEach(c => c.updateDisplay());
       }
     };
@@ -172,33 +110,23 @@
             sunLight.visible = false;
             ambientFill.intensity = 2.0;
         }
-
         const phi = THREE.MathUtils.degToRad(90 - params.lightElevation);
         const theta = THREE.MathUtils.degToRad(params.lightAzimuth);
         sunLight.position.setFromSphericalCoords(params.lightDistance, phi, theta);
     }
-    
     updateLightLogic();
 
-    // --- MODEL SWAPPING LOGIC ---
+    // --- SWAP LOGIC ---
     function updateModelSelection() {
-        const urlToLoad = params.showMainPart ? modelUrlA : modelUrlB;
-        loadModel(urlToLoad);
+        const url = params.showMainPart ? modelUrlA : modelUrlB;
+        loadModel(url);
     }
 
     function loadModel(url) {
-        // 1. Clean up old model
-        if (currentModel) {
-            scene.remove(currentModel);
-            modelMaterials = []; // Clear old materials
-        }
-
-        // 2. Load new model
+        if (currentModel) { scene.remove(currentModel); modelMaterials = []; }
         loader.load(url, (gltf) => {
-            const model = gltf.scene;
-            currentModel = model;
-
-            model.traverse(n => {
+            currentModel = gltf.scene;
+            currentModel.traverse(n => {
                 if (n.isMesh && n.material) {
                     n.material.metalness = params.metalness;
                     n.material.roughness = params.roughness;
@@ -206,40 +134,22 @@
                     modelMaterials.push(n.material);
                 }
             });
-            scene.add(model);
-            
-            // 3. Center and Position Logic (Copied from your code)
-            const box = new THREE.Box3().setFromObject(model);
+            scene.add(currentModel);
+            const box = new THREE.Box3().setFromObject(currentModel);
             const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            model.position.sub(center);
-                  
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const cameraZ = Math.abs(maxDim / 2 / Math.tan((camera.fov * Math.PI / 180) / 2));
-            
-            // Only force camera reset if you want it to jump back on every swap
-            // camera.position.set(0, maxDim * 0.2, cameraZ * 2.2);
-            
+            currentModel.position.sub(center);
             controls.target.set(0,0,0);
             controls.update();
-
-        }, undefined, (error) => {
-            console.error("Error loading model:", error);
         });
     }
 
     function updateMaterials() {
-        modelMaterials.forEach(m => {
-            m.metalness = params.metalness;
-            m.roughness = params.roughness;
-        });
+        modelMaterials.forEach(m => { m.metalness = params.metalness; m.roughness = params.roughness; });
     }
 
-    // --- Omni Lighting (Preserved) ---
-    // Note: These lights will stay active even in "Dark Mode" because they are separate
+    // --- OMNI LIGHTS (Preserved) ---
     const ambient = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambient);
-
     const directions = [
         new THREE.Vector3(0, 10, 0), new THREE.Vector3(0, -10, 0),
         new THREE.Vector3(10, 0, 0), new THREE.Vector3(-10, 0, 0),
@@ -254,29 +164,22 @@
     // --- GUI ---
     const gui = new GUI({ title: 'A.P.I The Robot' });
 
-    // New Folder for the Swap Button
-    const modelFolder = gui.addFolder('Model Config');
-    modelFolder.add(params, 'showMainPart').name('Show Main Part').onChange(updateModelSelection);
-
     const lightFolder = gui.addFolder('Dynamic Lighting');
     lightFolder.add(params, 'enableSun').name('Directional Light Mode').onChange(updateLightLogic);
     lightFolder.add(params, 'lightAzimuth', 0, 360).name('Horizontal Move').onChange(updateLightLogic);
     lightFolder.add(params, 'lightElevation', -90, 90).name('Vertical Move').onChange(updateLightLogic);
 
     const matFolder = gui.addFolder('Material Finish');
+    // Model swap added right here inside Material Finish
+    matFolder.add(params, 'showMainPart').name('Show Extra Part').onChange(updateModelSelection);
     matFolder.add(params, 'metalness', 0, 1).name('Metalness').onChange(updateMaterials);
     matFolder.add(params, 'roughness', 0, 1).name('Roughness').onChange(updateMaterials);
 
     gui.add(params, 'reset').name('Reset Studio');
 
-    // Initial Load
-    updateModelSelection();
+    updateModelSelection(); // Start by loading the default model
 
-    function animate() {
-        requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
-    }
+    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
     animate();
 
     window.addEventListener('resize', () => {
