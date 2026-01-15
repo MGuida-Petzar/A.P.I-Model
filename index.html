@@ -8,7 +8,7 @@
   html, body { height: 100%; margin: 0; padding: 0; background: #0b0b0b; overflow: hidden; width: 100%; }
   canvas { display: block; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
 
-  /* Loading Screen Overlay */
+  /* Loading Screen */
   #loading-overlay {
     position: fixed;
     top: 0; left: 0;
@@ -44,7 +44,7 @@
     transition: width 0.2s ease;
   }
 
-  /* GUI Style */
+  /* Style of the gui */
   .lil-gui { 
     --background-color: rgba(28, 27, 31, 0.92);
     --text-color: #e6e1e5;
@@ -75,7 +75,7 @@
 </head>
 <body>
   <div id="loading-overlay">
-    <div class="loader-text">Loading A.P.I Models ... <span id="percent">0%</span></div>
+    <div class="loader-text">Loading A.P.I Models... <span id="percent">0%</span></div>
     <div class="progress-container"><div id="progress-bar"></div></div>
   </div>
 
@@ -87,7 +87,7 @@
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
-    // --- CONFIG ---
+    // --- Model configs ---
     const modelUrlA = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API21.glb';
     const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; 
 
@@ -111,7 +111,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- LIGHTS ---
+    // --- Directional lights ---
     const ambientFill = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambientFill);
 
@@ -171,7 +171,7 @@
         loadModel(url);
     }
 
-    // --- THE RESTORED LOADER LOGIC ---
+    // --- Load thingys ---
     function loadModel(url) {
         overlay.style.opacity = "1";
         progressBar.style.width = "0%";
@@ -191,7 +191,7 @@
             });
             scene.add(currentModel);
 
-            // RESTORING YOUR CAMERA MATH HERE:
+            // Camera please dont break:
             const box = new THREE.Box3().setFromObject(currentModel);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
@@ -200,7 +200,7 @@
             const maxDim = Math.max(size.x, size.y, size.z);
             const cameraZ = Math.abs(maxDim / 2 / Math.tan((camera.fov * Math.PI / 180) / 2));
             
-            // This sets the camera position exactly like your original code
+            // im losing it haha but is working CAMERA
             camera.position.set(0, maxDim * 0.2, cameraZ * 2.2);
             controls.target.set(0,0,0);
             controls.update();
@@ -248,4 +248,5 @@
   </script>
 </body>
 </html>
+
 
