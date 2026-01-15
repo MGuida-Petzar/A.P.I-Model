@@ -8,7 +8,7 @@
   html, body { height: 100%; margin: 0; padding: 0; background: #0b0b0b; overflow: hidden; width: 100%; }
   canvas { display: block; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
 
-  /* Loading Screen */
+  /* Loading Screen Overlay */
   #loading-overlay {
     position: fixed;
     top: 0; left: 0;
@@ -44,7 +44,7 @@
     transition: width 0.2s ease;
   }
 
-  /* Style of the gui */
+  /* GUI Style */
   .lil-gui { 
     --background-color: rgba(28, 27, 31, 0.92);
     --text-color: #e6e1e5;
@@ -87,7 +87,7 @@
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
-    // --- 1. MODEL URLs (Add your new links here) ---
+    // ---  MODEL CONFIGS ---
     const modelUrlA = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API21.glb';
     const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; 
     const modelUrlC = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API23Metal.glb'; 
@@ -168,21 +168,20 @@
     }
     updateLightLogic();
 
-    // --- 2. UPDATED SELECTION LOGIC ---
+    // --- 2. SWITCH LOGIC ---
     function updateModelSelection() {
         let selectedUrl;
-        
         switch(params.modelVariant) {
             case 'Full Body': selectedUrl = modelUrlA; break;
             case 'Leg Off':   selectedUrl = modelUrlB; break;
-            case 'Variant 3': selectedUrl = modelUrlC; break;
-            case 'Variant 4': selectedUrl = modelUrlD; break;
-            default:          selectedUrl = modelUrlA;
+            case 'Reflection': selectedUrl = modelUrlC; break;
+            case 'Gravony':    selectedUrl = modelUrlD; break;
+            default:           selectedUrl = modelUrlA;
         }
-        
         loadModel(selectedUrl);
     }
 
+    // --- 3. LOADER (KEEPING YOUR CAMERA MATH) ---
     function loadModel(url) {
         overlay.style.opacity = "1";
         progressBar.style.width = "0%";
@@ -229,15 +228,14 @@
         modelMaterials.forEach(m => { m.metalness = params.metalness; m.roughness = params.roughness; });
     }
 
-    // --- 3. UPDATED GUI ---
+    // --- 4. GUI ---
     const gui = new GUI({ title: 'A.P.I STUDIO' });
     const configFolder = gui.addFolder('A.P.I - Toggles');
     
-    // Updated this line to include 4 options
-    configFolder.add(params, 'modelVariant', ['Full Body', 'Leg Off', 'Variant 3', 'Variant 4'])
+    // Updated Dropdown List
+    configFolder.add(params, 'modelVariant', ['Full Body', 'Leg Off', 'Reflection', 'Gravony'])
                 .name('Model Variant')
                 .onChange(updateModelSelection);
-    
     configFolder.open();
 
     const lightFolder = gui.addFolder('Dynamic Lighting');
