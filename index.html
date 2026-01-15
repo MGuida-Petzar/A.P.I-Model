@@ -87,9 +87,11 @@
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
-    // --- Model configs ---
+    // --- 1. MODEL URLs (Add your new links here) ---
     const modelUrlA = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API21.glb';
     const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; 
+    const modelUrlC = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API23Metal.glb'; 
+    const modelUrlD = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API23Gravony.glb'; 
 
     const overlay = document.getElementById('loading-overlay');
     const progressBar = document.getElementById('progress-bar');
@@ -111,7 +113,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- Directional lights ---
+    // --- LIGHTING ---
     const ambientFill = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambientFill);
 
@@ -166,12 +168,21 @@
     }
     updateLightLogic();
 
+    // --- 2. UPDATED SELECTION LOGIC ---
     function updateModelSelection() {
-        const url = (params.modelVariant === 'Full Body') ? modelUrlA : modelUrlB;
-        loadModel(url);
+        let selectedUrl;
+        
+        switch(params.modelVariant) {
+            case 'Full Body': selectedUrl = modelUrlA; break;
+            case 'Leg Off':   selectedUrl = modelUrlB; break;
+            case 'Variant 3': selectedUrl = modelUrlC; break;
+            case 'Variant 4': selectedUrl = modelUrlD; break;
+            default:          selectedUrl = modelUrlA;
+        }
+        
+        loadModel(selectedUrl);
     }
 
-    // --- Load thingys ---
     function loadModel(url) {
         overlay.style.opacity = "1";
         progressBar.style.width = "0%";
@@ -191,7 +202,6 @@
             });
             scene.add(currentModel);
 
-            // Camera please dont break:
             const box = new THREE.Box3().setFromObject(currentModel);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
@@ -200,7 +210,6 @@
             const maxDim = Math.max(size.x, size.y, size.z);
             const cameraZ = Math.abs(maxDim / 2 / Math.tan((camera.fov * Math.PI / 180) / 2));
             
-            // im losing it haha but is working CAMERA
             camera.position.set(0, maxDim * 0.2, cameraZ * 2.2);
             controls.target.set(0,0,0);
             controls.update();
@@ -220,9 +229,15 @@
         modelMaterials.forEach(m => { m.metalness = params.metalness; m.roughness = params.roughness; });
     }
 
+    // --- 3. UPDATED GUI ---
     const gui = new GUI({ title: 'A.P.I STUDIO' });
     const configFolder = gui.addFolder('A.P.I - Toggles');
-    configFolder.add(params, 'modelVariant', ['Full Body', 'Leg Off']).name('Model Variant').onChange(updateModelSelection);
+    
+    // Updated this line to include 4 options
+    configFolder.add(params, 'modelVariant', ['Full Body', 'Leg Off', 'Variant 3', 'Variant 4'])
+                .name('Model Variant')
+                .onChange(updateModelSelection);
+    
     configFolder.open();
 
     const lightFolder = gui.addFolder('Dynamic Lighting');
@@ -248,5 +263,3 @@
   </script>
 </body>
 </html>
-
-
