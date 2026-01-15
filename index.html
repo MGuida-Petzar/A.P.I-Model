@@ -47,7 +47,7 @@
 </head>
 <body>
   <div id="loading-overlay">
-    <div class="loader-text">Loading A.P.I Environment... <span id="percent">0%</span></div>
+    <div class="loader-text">Loading A.P.I ... <span id="percent">0%</span></div>
     <div class="progress-container"><div id="progress-bar"></div></div>
   </div>
 
@@ -57,15 +57,14 @@
     import * as THREE from 'three';
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/loaders/GLTFLoader.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
-    import { RGBELoader } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/loaders/RGBELoader.js'; // Added for reflections
+    import { RGBELoader } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/loaders/RGBELoader.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
-    // --- 1. CONFIG ---
+    // --- 1. MODEL CONFIGS ---
     const modelUrlA = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API21.glb';
     const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; 
-    const modelUrlC = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API23Metal.glb'; 
     const modelUrlD = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API23Gravony.glb'; 
-    const hdrUrl = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/pretoria_gardens_4k.hdr'; // Studio Environment
+    const hdrUrl = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/pretoria_gardens_4k.hdr'; 
 
     const overlay = document.getElementById('loading-overlay');
     const progressBar = document.getElementById('progress-bar');
@@ -77,7 +76,7 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.8; 
+    renderer.toneMappingExposure = 1.0; 
     renderer.physicallyCorrectLights = true;
 
     const scene = new THREE.Scene();
@@ -87,22 +86,32 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- 2. LIGHTING & ENVIRONMENT ---
-    const ambientFill = new THREE.AmbientLight(0xffffff, 1.0);
+    // --- 2. LIGHTING SETUP (Restored Omni-lights) ---
+    const ambientFill = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambientFill);
 
     const sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
     scene.add(sunLight);
 
-    // Load Environment Map
-    const rgbeLoader = new RGBELoader();
-    let envMap = null;
+    const omniLights = [];
+    const directions = [
+        new THREE.Vector3(0, 10, 0), new THREE.Vector3(0, -10, 0),
+        new THREE.Vector3(10, 0, 0), new THREE.Vector3(-10, 0, 0),
+        new THREE.Vector3(0, 0, 10), new THREE.Vector3(0, 0, -10)
+    ];
+    directions.forEach(dir => {
+        const light = new THREE.DirectionalLight(0xffffff, 0.5);
+        light.position.copy(dir);
+        scene.add(light);
+        omniLights.push(light);
+    });
 
-    rgbeLoader.load(hdrUrl, (texture) => {
+    // Environment map storage
+    let envMap = null;
+    new RGBELoader().load(hdrUrl, (texture) => {
         texture.mapping = THREE.EquirectangularReflectionMapping;
         envMap = texture;
-        // Apply it by default
-        scene.environment = envMap;
+        if(params.showEnvironment) scene.environment = envMap;
     });
 
     // --- 3. STATE ---
@@ -112,9 +121,9 @@
 
     const params = {
       modelVariant: 'Full Body',
-      showEnvironment: true, // New Toggle
+      showEnvironment: true,
       metalness: 1.0, 
-      roughness: 0.1, // Lower roughness = better reflections
+      roughness: 0.5,
       enableSun: true,
       lightAzimuth: 0,
       lightElevation: 40.5,
@@ -122,7 +131,7 @@
           params.modelVariant = 'Full Body';
           params.showEnvironment = true;
           params.metalness = 1.0;
-          params.roughness = 0.1;
+          params.roughness = 0.5;
           updateEnvironment();
           updateLightLogic();
           updateModelSelection();
@@ -130,8 +139,17 @@
       }
     };
 
+    // THIS FUNCTION NOW COMPENSATES FOR DARKNESS
     function updateEnvironment() {
-        scene.environment = params.showEnvironment ? envMap : null;
+        if (params.showEnvironment) {
+            scene.environment = envMap;
+            ambientFill.intensity = 0.2; // Dim the lights when HDR is on
+            omniLights.forEach(l => l.intensity = 0.1);
+        } else {
+            scene.environment = null;
+            ambientFill.intensity = 1.5; // Brighten everything when HDR is off
+            omniLights.forEach(l => l.intensity = 0.5);
+        }
     }
 
     function updateLightLogic() {
@@ -146,7 +164,6 @@
         switch(params.modelVariant) {
             case 'Full Body': selectedUrl = modelUrlA; break;
             case 'Leg Off':   selectedUrl = modelUrlB; break;
-            case 'Reflection': selectedUrl = modelUrlC; break;
             case 'Gravony':    selectedUrl = modelUrlD; break;
             default:           selectedUrl = modelUrlA;
         }
@@ -163,7 +180,7 @@
                 if (n.isMesh && n.material) {
                     n.material.metalness = params.metalness;
                     n.material.roughness = params.roughness;
-                    n.material.envMapIntensity = 1.5; // Boost the reflection brightness
+                    n.material.envMapIntensity = 1.2;
                     modelMaterials.push(n.material);
                 }
             });
@@ -198,9 +215,9 @@
 
     // --- 4. GUI ---
     const gui = new GUI({ title: 'A.P.I STUDIO' });
-    const configFolder = gui.addFolder('🔧 A.P.I CONFIGURATION');
-    configFolder.add(params, 'modelVariant', ['Full Body', 'Leg Off', 'Reflection', 'Gravony']).name('Model Variant').onChange(updateModelSelection);
-    configFolder.add(params, 'showEnvironment').name('Enable Reflections').onChange(updateEnvironment);
+    const configFolder = gui.addFolder('A.P.I Variants');
+    configFolder.add(params, 'modelVariant', ['Full Body', 'Leg Off', 'Gravony']).name('Model Variant').onChange(updateModelSelection);
+    configFolder.add(params, 'showEnvironment').name('Enable Space Reflections').onChange(updateEnvironment);
     configFolder.open();
 
     const lightFolder = gui.addFolder('Dynamic Lighting');
@@ -227,4 +244,3 @@
   </script>
 </body>
 </html>
-
