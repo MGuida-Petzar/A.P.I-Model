@@ -47,9 +47,10 @@
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
 
-    // --- URLs ---
+    // --- 1. MODEL LINKS ---
     const modelUrlA = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API21.glb';
-    const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; // Update this link!
+    // ! REPLACE THIS LINK WITH YOUR SECOND MODEL !
+    const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; 
 
     const canvas = document.getElementById('canvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -69,33 +70,47 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- BASE LIGHTS ---
+    // --- 2. LIGHTING SETUP (Preserved exactly) ---
     const ambientFill = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambientFill);
 
     const sunLight = new THREE.DirectionalLight(0xffffff, 3.5);
     scene.add(sunLight);
 
-    // --- STATE ---
+    // Omni Lighting
+    const ambientOmni = new THREE.AmbientLight(0xffffff, 2.0);
+    scene.add(ambientOmni);
+    const directions = [
+        new THREE.Vector3(0, 10, 0), new THREE.Vector3(0, -10, 0),
+        new THREE.Vector3(10, 0, 0), new THREE.Vector3(-10, 0, 0),
+        new THREE.Vector3(0, 0, 10), new THREE.Vector3(0, 0, -10)
+    ];
+    directions.forEach(dir => {
+        const light = new THREE.DirectionalLight(0xffffff, 0.5);
+        light.position.copy(dir);
+        scene.add(light);
+    });
+
+    // --- 3. STATE ---
     let currentModel = null;
     let modelMaterials = [];
     const loader = new GLTFLoader();
 
     const params = {
+      modelVariant: 'Full Body', // Default dropdown value
       metalness: 1.0, 
       roughness: 0.5,
       enableSun: true,
       lightAzimuth: 0,
       lightElevation: 40.5,
       lightDistance: 10,
-      showMainPart: true, // The toggle variable
       reset: function() {
+          params.modelVariant = 'Full Body';
           params.metalness = 1.0;
           params.roughness = 0.5;
           params.enableSun = true;
           params.lightAzimuth = 0;
           params.lightElevation = 40.5;
-          params.showMainPart = true;
           updateLightLogic();
           updateModelSelection();
           gui.controllersRecursive().forEach(c => c.updateDisplay());
@@ -116,14 +131,17 @@
     }
     updateLightLogic();
 
-    // --- SWAP LOGIC ---
+    // --- 4. SWAP LOGIC ---
     function updateModelSelection() {
-        const url = params.showMainPart ? modelUrlA : modelUrlB;
+        const url = (params.modelVariant === 'Full Body') ? modelUrlA : modelUrlB;
         loadModel(url);
     }
 
     function loadModel(url) {
-        if (currentModel) { scene.remove(currentModel); modelMaterials = []; }
+        if (currentModel) { 
+            scene.remove(currentModel); 
+            modelMaterials = []; 
+        }
         loader.load(url, (gltf) => {
             currentModel = gltf.scene;
             currentModel.traverse(n => {
@@ -147,22 +165,15 @@
         modelMaterials.forEach(m => { m.metalness = params.metalness; m.roughness = params.roughness; });
     }
 
-    // --- OMNI LIGHTS (Preserved) ---
-    const ambient = new THREE.AmbientLight(0xffffff, 2.0);
-    scene.add(ambient);
-    const directions = [
-        new THREE.Vector3(0, 10, 0), new THREE.Vector3(0, -10, 0),
-        new THREE.Vector3(10, 0, 0), new THREE.Vector3(-10, 0, 0),
-        new THREE.Vector3(0, 0, 10), new THREE.Vector3(0, 0, -10)
-    ];
-    directions.forEach(dir => {
-        const light = new THREE.DirectionalLight(0xffffff, 0.5);
-        light.position.copy(dir);
-        scene.add(light);
-    });
-    
-    // --- GUI ---
-    const gui = new GUI({ title: 'A.P.I The Robot' });
+    // --- 5. GUI (New Order) ---
+    const gui = new GUI({ title: 'A.P.I STUDIO' });
+
+    // SEPARATE FOLDER AT THE TOP
+    const configFolder = gui.addFolder('🔧 A.P.I CONFIGURATION');
+    configFolder.add(params, 'modelVariant', ['Full Body', 'Part Off'])
+                .name('Model Variant')
+                .onChange(updateModelSelection);
+    configFolder.open(); // Make it open by default
 
     const lightFolder = gui.addFolder('Dynamic Lighting');
     lightFolder.add(params, 'enableSun').name('Directional Light Mode').onChange(updateLightLogic);
@@ -170,14 +181,13 @@
     lightFolder.add(params, 'lightElevation', -90, 90).name('Vertical Move').onChange(updateLightLogic);
 
     const matFolder = gui.addFolder('Material Finish');
-    // Model swap added right here inside Material Finish
-    matFolder.add(params, 'showMainPart').name('Show Extra Part').onChange(updateModelSelection);
     matFolder.add(params, 'metalness', 0, 1).name('Metalness').onChange(updateMaterials);
     matFolder.add(params, 'roughness', 0, 1).name('Roughness').onChange(updateMaterials);
 
     gui.add(params, 'reset').name('Reset Studio');
 
-    updateModelSelection(); // Start by loading the default model
+    // Initial load
+    updateModelSelection();
 
     function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
     animate();
