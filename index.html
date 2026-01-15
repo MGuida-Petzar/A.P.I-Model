@@ -4,84 +4,84 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>A.P.I - Studio</title>
-<style>
-  /* Prevents any scrollbars from appearing */
-  html, body { 
-    height: 100%; 
-    margin: 0; 
-    padding: 0;
-    background: #0b0b0b; 
-    overflow: hidden; /* This is the key fix for scrollbars */
-    width: 100%;
-  }
+  <style>
+    /* Prevents any scrollbars from appearing */
+    html, body { 
+      height: 100%; 
+      margin: 0; 
+      padding: 0;
+      background: #0b0b0b; 
+      overflow: hidden; 
+      width: 100%;
+    }
 
-  /* Ensures the 3D area fills the screen exactly */
-  canvas { 
-    display: block; 
-    width: 100vw; 
-    height: 100vh; 
-    position: fixed; 
-    top: 0; 
-    left: 0;
-  }
+    /* Ensures the 3D area fills the screen exactly */
+    canvas { 
+      display: block; 
+      width: 100vw; 
+      height: 100vh; 
+      position: fixed; 
+      top: 0; 
+      left: 0;
+    }
 
-  /* Material You GUI Styling */
-  .lil-gui { 
-    --background-color: rgba(28, 27, 31, 0.92);
-    --text-color: #e6e1e5;
-    --title-background-color: transparent;
-    --widget-color: #4f378b; 
-    --hover-color: #6750a4;
-    --focus-color: #d0bcff;
-    --number-color: #d0bcff;
-    --string-color: #d0bcff;
-    border-radius: 32px !important; 
-    padding: 20px !important;
-    border: none !important;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
-    backdrop-filter: blur(14px);
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-  }
+    /* Material You GUI Styling */
+    .lil-gui { 
+      --background-color: rgba(28, 27, 31, 0.92);
+      --text-color: #e6e1e5;
+      --title-background-color: transparent;
+      --widget-color: #4f378b; 
+      --hover-color: #6750a4;
+      --focus-color: #d0bcff;
+      --number-color: #d0bcff;
+      --string-color: #d0bcff;
+      border-radius: 32px !important; 
+      padding: 20px !important;
+      border: none !important;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
+      backdrop-filter: blur(14px);
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    }
 
-  .lil-gui .controller {
-    margin-bottom: 8px !important;
-    border-radius: 12px !important; 
-    background: rgba(255, 255, 255, 0.05) !important;
-    padding: 4px 8px !important;
-    display: flex !important;
-    align-items: center !important;
-  }
+    .lil-gui .controller {
+      margin-bottom: 8px !important;
+      border-radius: 12px !important; 
+      background: rgba(255, 255, 255, 0.05) !important;
+      padding: 4px 8px !important;
+      display: flex !important;
+      align-items: center !important;
+    }
 
-  .lil-gui .widget {
-    flex-grow: 1 !important;
-    display: flex !important;
-    align-items: center !important;
-    min-width: 100px !important;
-  }
+    .lil-gui .widget {
+      flex-grow: 1 !important;
+      display: flex !important;
+      align-items: center !important;
+      min-width: 100px !important;
+    }
 
-  .lil-gui .slider {
-    background: rgba(255, 255, 255, 0.1) !important;
-    height: 6px !important;
-    border-radius: 10px !important;
-  }
+    .lil-gui .slider {
+      background: rgba(255, 255, 255, 0.1) !important;
+      height: 6px !important;
+      border-radius: 10px !important;
+    }
 
-  .lil-gui .slider-fg {
-    background: #d0bcff !important;
-    border-radius: 10px !important;
-  }
+    .lil-gui .slider-fg {
+      background: #d0bcff !important;
+      border-radius: 10px !important;
+    }
 
-  .lil-gui .controller.button {
-    background: #d0bcff !important; 
-    border-radius: 40px !important;
-    margin-top: 10px !important;
-    justify-content: center !important;
-  }
+    .lil-gui .controller.button {
+      background: #d0bcff !important; 
+      border-radius: 40px !important;
+      margin-top: 10px !important;
+      justify-content: center !important;
+    }
 
-  .lil-gui .controller.button .name { 
-    color: #381e72 !important; 
-    font-weight: 700 !important; 
-  }
-</style>
+    .lil-gui .controller.button .name { 
+      color: #381e72 !important; 
+      font-weight: 700 !important; 
+    }
+  </style>
 
   <script type="importmap">
   {
@@ -99,6 +99,11 @@
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/loaders/GLTFLoader.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.144.0/examples/jsm/controls/OrbitControls.js';
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.0/dist/lil-gui.esm.min.js';
+
+    // --- MODEL URLs ---
+    const modelUrlA = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API21.glb';
+    // !IMPORTANT: PASTE YOUR SECOND URL HERE (Part Off Version)
+    const modelUrlB = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API22OFF.glb'; 
 
     // --- Renderer ---
     const canvas = document.getElementById('canvas');
@@ -120,12 +125,17 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // --- LIGHTING SETUP ---
+    // --- LIGHTING SETUP (Base) ---
     const ambientFill = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambientFill);
 
     const sunLight = new THREE.DirectionalLight(0xffffff, 3.5);
     scene.add(sunLight);
+
+    // --- STATE VARIABLES ---
+    let currentModel = null;
+    let modelMaterials = [];
+    const loader = new GLTFLoader();
 
     // --- DEFAULTS ---
     const params = {
@@ -135,13 +145,20 @@
       lightAzimuth: 0,
       lightElevation: 40.5,
       lightDistance: 10,
+      
+      // NEW: Toggle for Swapping
+      showMainPart: true,
+
       reset: function() {
           params.metalness = 1.0;
           params.roughness = 0.5;
           params.enableSun = true;
           params.lightAzimuth = 0;
           params.lightElevation = 40.5;
+          params.showMainPart = true;
+
           updateLightLogic();
+          updateModelSelection(); // Reset model state
           updateMaterials();
           gui.controllersRecursive().forEach(c => c.updateDisplay());
       }
@@ -163,33 +180,53 @@
     
     updateLightLogic();
 
-    // --- Loader ---
-    let modelMaterials = [];
-    const loader = new GLTFLoader();
-    const modelUrl = 'https://mguida-petzar.github.io/A.P.I-Model/new-folder/Project%20API21.glb';
+    // --- MODEL SWAPPING LOGIC ---
+    function updateModelSelection() {
+        const urlToLoad = params.showMainPart ? modelUrlA : modelUrlB;
+        loadModel(urlToLoad);
+    }
 
-    loader.load(modelUrl, (gltf) => {
-        const model = gltf.scene;
-        model.traverse(n => {
-            if (n.isMesh && n.material) {
-                n.material.metalness = params.metalness;
-                n.material.roughness = params.roughness;
-                n.material.side = THREE.DoubleSide;
-                modelMaterials.push(n.material);
-            }
+    function loadModel(url) {
+        // 1. Clean up old model
+        if (currentModel) {
+            scene.remove(currentModel);
+            modelMaterials = []; // Clear old materials
+        }
+
+        // 2. Load new model
+        loader.load(url, (gltf) => {
+            const model = gltf.scene;
+            currentModel = model;
+
+            model.traverse(n => {
+                if (n.isMesh && n.material) {
+                    n.material.metalness = params.metalness;
+                    n.material.roughness = params.roughness;
+                    n.material.side = THREE.DoubleSide;
+                    modelMaterials.push(n.material);
+                }
+            });
+            scene.add(model);
+            
+            // 3. Center and Position Logic (Copied from your code)
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            model.position.sub(center);
+                  
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const cameraZ = Math.abs(maxDim / 2 / Math.tan((camera.fov * Math.PI / 180) / 2));
+            
+            // Only force camera reset if you want it to jump back on every swap
+            // camera.position.set(0, maxDim * 0.2, cameraZ * 2.2);
+            
+            controls.target.set(0,0,0);
+            controls.update();
+
+        }, undefined, (error) => {
+            console.error("Error loading model:", error);
         });
-        scene.add(model);
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        model.position.sub(center);
-              
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const cameraZ = Math.abs(maxDim / 2 / Math.tan((camera.fov * Math.PI / 180) / 2));
-        camera.position.set(0, maxDim * 0.2, cameraZ * 2.2);
-        controls.target.set(0,0,0);
-        controls.update();
-    });
+    }
 
     function updateMaterials() {
         modelMaterials.forEach(m => {
@@ -198,7 +235,8 @@
         });
     }
 
-    // --- Omni Lighting ---
+    // --- Omni Lighting (Preserved) ---
+    // Note: These lights will stay active even in "Dark Mode" because they are separate
     const ambient = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambient);
 
@@ -216,6 +254,10 @@
     // --- GUI ---
     const gui = new GUI({ title: 'A.P.I The Robot' });
 
+    // New Folder for the Swap Button
+    const modelFolder = gui.addFolder('Model Config');
+    modelFolder.add(params, 'showMainPart').name('Show Main Part').onChange(updateModelSelection);
+
     const lightFolder = gui.addFolder('Dynamic Lighting');
     lightFolder.add(params, 'enableSun').name('Directional Light Mode').onChange(updateLightLogic);
     lightFolder.add(params, 'lightAzimuth', 0, 360).name('Horizontal Move').onChange(updateLightLogic);
@@ -226,6 +268,9 @@
     matFolder.add(params, 'roughness', 0, 1).name('Roughness').onChange(updateMaterials);
 
     gui.add(params, 'reset').name('Reset Studio');
+
+    // Initial Load
+    updateModelSelection();
 
     function animate() {
         requestAnimationFrame(animate);
@@ -242,23 +287,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
